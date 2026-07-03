@@ -2436,3 +2436,89 @@ function populateGeneratorPayments() {
     select.appendChild(opt);
   });
 }
+
+async function backupDatabase() {
+  try {
+    showToast('Menyiapkan file backup...', false);
+    const response = await fetch('/api/admin/database/backup', {
+      headers: { 'Authorization': token }
+    });
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || 'Failed to download backup');
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const timestamp = new Date().toISOString().slice(0, 10);
+    a.download = `backup_database_${timestamp}.sqlite`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    showToast('Backup berhasil diunduh!');
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function resetDatabase() {
+  const confirmed = confirm('PERINGATAN KERAS!\n\nTindakan ini akan menghapus SELURUH data invoice, data redemption (scan tiket), dan log WhatsApp.\n\nApakah Anda yakin ingin melanjutkan reset database?');
+  if (!confirmed) return;
+  
+  const doubleConfirmed = prompt('Ketik "RESET" untuk mengonfirmasi tindakan ini:');
+  if (doubleConfirmed !== 'RESET') {
+    showToast('Reset dibatalkan.', true);
+    return;
+  }
+
+  try {
+    showToast('Mereset database...', false);
+    const response = await fetch('/api/admin/database/reset', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Reset failed');
+    showToast('Database berhasil direset!');
+    setTimeout(() => window.location.reload(), 1500);
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function handleRestoreFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const confirmed = confirm(`Apakah Anda yakin ingin memulihkan database menggunakan file "${file.name}"?\n\nDatabase saat ini akan ditimpa seluruhnya.`);
+  if (!confirmed) {
+    input.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('backup', file);
+
+  try {
+    showToast('Memulihkan database (sedang upload)...', false);
+    const response = await fetch('/api/admin/database/restore', {
+      method: 'POST',
+      headers: {
+        'Authorization': token
+      },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Restore failed');
+    showToast('Database berhasil dipulihkan!');
+    setTimeout(() => window.location.reload(), 1500);
+  } catch (err) {
+    showToast(err.message, true);
+    input.value = '';
+  }
+}

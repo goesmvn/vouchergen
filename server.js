@@ -2,8 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 const sqlite3 = require('sqlite3').verbose();
 const whatsapp = require('./whatsapp');
+
+const upload = multer({ dest: '/tmp/' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -508,6 +511,67 @@ app.put('/api/settings', authenticateToken, async (req, res) => {
       await dbRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
     }
     res.json({ message: 'Settings updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Database Management endpoints
+app.get('/api/admin/database/backup', authenticateToken, (req, res) => {
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: 'Database file not found.' });
+  }
+  res.download(dbPath, 'database.sqlite');
+});
+
+app.post('/api/admin/database/reset', authenticateToken, async (req, res) => {
+  try {
+    await dbRun('DROP TABLE IF EXISTS redemptions');
+    await dbRun('DROP TABLE IF EXISTS invoices');
+    await dbRun('DROP TABLE IF EXISTS whatsapp_logs');
+    await dbRun('DROP TABLE IF EXISTS settings');
+    await dbRun('DROP TABLE IF EXISTS payment_methods');
+    
+    await initializeDatabase();
+    res.json({ message: 'Database reset successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/database/restore', authenticateToken, upload.single('backup'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No backup file uploaded.' });
+    }
+
+    const tempPath = req.file.path;
+
+    // Verify it is a valid sqlite file
+    const header = fs.readFileSync(tempPath, { encoding: 'utf8', flag: 'r' }).slice(0, 15);
+    if (header !== 'SQLite format 3') {
+      fs.unlinkSync(tempPath);
+      return res.status(400).json({ error: 'Invalid backup file. Must be a valid SQLite database file.' });
+    }
+
+    // Send success response first before closing and exiting
+    res.json({ message: 'Database successfully restored. Restarting application...' });
+
+    // In the background, close db, replace file, and exit to trigger Docker restart
+    setTimeout(() => {
+      db.close((err) => {
+        try {
+          fs.copyFileSync(tempPath, dbPath);
+          fs.unlinkSync(tempPath);
+          console.log('Database restored. Exiting process for container restart.');
+          process.exit(0);
+        } catch (copyErr) {
+          console.error('Error replacing database file during restore:', copyErr.message);
+          process.exit(1);
+        }
+      });
+    }, 1000);
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

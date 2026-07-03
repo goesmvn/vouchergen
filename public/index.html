@@ -1107,6 +1107,54 @@
               </div>
 
             </form>
+
+            <!-- Database Management Section -->
+            <div class="mt-8 pt-8 border-t border-outline-variant space-y-4">
+              <h4 class="font-bold text-xs uppercase text-primary tracking-wider flex items-center gap-1">
+                <span class="material-symbols-outlined text-[16px]">database</span>
+                Database Management
+              </h4>
+              <p class="text-xs text-on-surface-variant">Kelola database SQLite. Anda dapat mengunduh salinan cadangan (backup), memulihkan database dari file cadangan (restore), atau menghapus seluruh data transaksi (reset).</p>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                <!-- Backup Card -->
+                <div class="bg-surface-container-low p-5 rounded-xl border border-outline-variant flex flex-col justify-between gap-4">
+                  <div>
+                    <h5 class="font-bold text-sm text-on-surface">Backup Database</h5>
+                    <p class="text-[11px] text-on-surface-variant mt-1">Unduh seluruh database saat ini ke komputer Anda dalam format file SQLite (.sqlite).</p>
+                  </div>
+                  <button type="button" onclick="backupDatabase()" class="w-full bg-secondary-container text-on-secondary-container py-2 px-4 rounded-lg font-bold hover:opacity-90 active:scale-95 transition-all text-xs flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">download</span> Unduh Backup
+                  </button>
+                </div>
+
+                <!-- Restore Card -->
+                <div class="bg-surface-container-low p-5 rounded-xl border border-outline-variant flex flex-col justify-between gap-4">
+                  <div>
+                    <h5 class="font-bold text-sm text-on-surface">Restore Database</h5>
+                    <p class="text-[11px] text-on-surface-variant mt-1">Pulihkan database dari file backup SQLite (.sqlite) yang diunggah.</p>
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <input type="file" id="database-restore-file" accept=".sqlite, .db" class="hidden" onchange="handleRestoreFileSelected(this)">
+                    <button type="button" onclick="document.getElementById('database-restore-file').click()" class="w-full bg-secondary-container text-on-secondary-container py-2 px-4 rounded-lg font-bold hover:opacity-90 active:scale-95 transition-all text-xs flex items-center justify-center gap-1">
+                      <span class="material-symbols-outlined text-[16px]">upload</span> Pilih File &amp; Restore
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Reset Card -->
+                <div class="bg-surface-container-low p-5 rounded-xl border border-red-500/20 flex flex-col justify-between gap-4">
+                  <div>
+                    <h5 class="font-bold text-sm text-red-500">Reset Database</h5>
+                    <p class="text-[11px] text-on-surface-variant mt-1">Hapus semua data invoice, penukaran tiket, dan log WhatsApp. Pengaturan default akan di-seed ulang.</p>
+                  </div>
+                  <button type="button" onclick="resetDatabase()" class="w-full bg-red-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-red-600 active:scale-95 transition-all text-xs flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">delete_forever</span> Reset Seluruh Data
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </section>
 
