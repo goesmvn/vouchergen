@@ -10,7 +10,6 @@ services:
       - CHATBOT_URL=http://chatbot:5000
     volumes:
       - voucher-data:/data
-      - ./public:/usr/src/app/public
     depends_on:
       - chatbot
     networks:
