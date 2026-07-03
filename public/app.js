@@ -1773,16 +1773,44 @@ async function openVoucherModal(code) {
 
     let ticketsHtml = '';
 
-    validVouchers.forEach(data => {
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=002114&data=${encodeURIComponent(data.voucher_code)}`;
+    // Flat map vouchers to render a card for each item (ticket type) in the invoice
+    const itemsToRender = [];
+    validVouchers.forEach(invoice => {
+      const items = invoice.items || [];
+      items.forEach((item, index) => {
+        // If the voucher was loaded via a code with a suffix (e.g. VCH-xxx-1), only render that item
+        if (invoice.voucher_code.split('-').length > 3) {
+          itemsToRender.push({
+            invoice,
+            item,
+            itemVoucherCode: invoice.voucher_code,
+            isRedeemed: invoice.redeemed
+          });
+        } else {
+          // It's the main invoice code, generate suffixes for all items
+          const itemVoucherCode = `${invoice.voucher_code}-${index + 1}`;
+          itemsToRender.push({
+            invoice,
+            item,
+            itemVoucherCode: itemVoucherCode,
+            isRedeemed: (invoice.redeemed_items || []).includes(itemVoucherCode) || invoice.redeemed
+          });
+        }
+      });
+    });
+
+    itemsToRender.forEach(renderItem => {
+      const data = renderItem.invoice;
+      const item = renderItem.item;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=002114&data=${encodeURIComponent(renderItem.itemVoucherCode)}`;
       const visitLabel = data.visit_date || new Date(data.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-      const isRedeemed = data.redeemed;
+      const isRedeemed = renderItem.isRedeemed;
       const statusBadge = isRedeemed ? 'REDEEMED' : 'PAID / VALID';
       const badgeClass = isRedeemed ? 'badge-redeemed' : 'badge-paid';
       const merchantName = appSettings.merchant_name || 'Batur Hot Spring';
       const logoUrl = appSettings.merchant_logo_url || '';
       const website = appSettings.merchant_website || '';
-      const bgImg = getVoucherBgImage(data.voucher_code);
+      const bgImg = getVoucherBgImage(renderItem.itemVoucherCode);
 
       if (activeVoucherTemplate === 1) {
         // === TEMPLATE 1: CLASSIC (compact QR, big title) ===
@@ -1806,9 +1834,7 @@ async function openVoucherModal(code) {
             <!-- Big ticket name -->
             <div class="px-6 pt-7 pb-3 text-center">
               <div class="space-y-1 mb-2">
-                ${(data.items || []).map(i => `
-                  <div class="text-lg font-extrabold text-on-surface leading-tight">${i.ticket_title} <span class="text-primary">(x${i.quantity})</span></div>
-                `).join('')}
+                <div class="text-lg font-extrabold text-on-surface leading-tight">${item.ticket_title} <span class="text-primary">(x${item.quantity})</span></div>
               </div>
               <div class="text-sm font-semibold text-on-surface-variant mt-2">${data.customer_name}</div>
             </div>
@@ -1825,7 +1851,7 @@ async function openVoucherModal(code) {
               <div class="bg-white rounded-xl border border-outline-variant p-2 shadow-sm mb-3">
                 <img src="${qrCodeUrl}" alt="QR" class="w-[120px] h-[120px] object-contain">
               </div>
-              <div class="font-mono text-xs text-on-surface-variant tracking-wider">${data.voucher_code}</div>
+              <div class="font-mono text-xs text-on-surface-variant tracking-wider">${renderItem.itemVoucherCode}</div>
               <span class="mt-2 badge ${badgeClass} text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">${statusBadge}</span>
             </div>
             <!-- Footer -->
@@ -1858,9 +1884,7 @@ async function openVoucherModal(code) {
               <div class="px-5 py-4 border-b border-dashed border-emerald-200">
                 <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Jenis Tiket</div>
                 <div class="space-y-1">
-                  ${(data.items || []).map(i => `
-                    <div class="text-base font-extrabold text-gray-900 leading-tight">${i.ticket_title} <span class="text-emerald-700 font-black">(x${i.quantity})</span></div>
-                  `).join('')}
+                  <div class="text-base font-extrabold text-gray-900 leading-tight">${item.ticket_title} <span class="text-emerald-700 font-black">(x${item.quantity})</span></div>
                 </div>
               </div>
               <!-- Row 3: 3-col info -->
@@ -1871,7 +1895,7 @@ async function openVoucherModal(code) {
                 </div>
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center justify-center">
                   <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Total Pax</div>
-                  <div class="text-2xl font-black text-emerald-700">${(data.items || []).reduce((s, i) => s + i.quantity, 0)}</div>
+                  <div class="text-2xl font-black text-emerald-700">${item.quantity}</div>
                 </div>
                 <div class="px-4 py-3">
                   <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Gate</div>
@@ -1884,7 +1908,7 @@ async function openVoucherModal(code) {
                 <div class="flex-1 px-5 py-5" style="background:linear-gradient(135deg,#1a3d2b 0%,#2d6a4f 100%)">
                   <div class="text-[9px] uppercase tracking-[3px] text-emerald-300 font-bold mb-2">📅 Tanggal Kunjungan</div>
                   <div class="text-white font-black text-xl leading-tight">${visitLabel}</div>
-                  <div class="mt-3 font-mono text-emerald-300 text-[10px] tracking-wider">${data.voucher_code}</div>
+                  <div class="mt-3 font-mono text-emerald-300 text-[10px] tracking-wider">${renderItem.itemVoucherCode}</div>
                 </div>
                 <div class="flex flex-col items-center justify-center px-4 py-4 border-l border-dashed border-emerald-200 bg-white">
                   <img src="${qrCodeUrl}" alt="QR" class="w-[100px] h-[100px] object-contain">
@@ -1915,9 +1939,7 @@ async function openVoucherModal(code) {
             <div class="px-5 pt-5 pb-2">
               <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Jenis Tiket</div>
               <div class="space-y-1">
-                ${(data.items || []).map(i => `
-                  <div class="text-base font-extrabold text-white leading-tight">${i.ticket_title} <span style="color:#52b788">(x${i.quantity})</span></div>
-                `).join('')}
+                <div class="text-base font-extrabold text-white leading-tight">${item.ticket_title} <span style="color:#52b788">(x${item.quantity})</span></div>
               </div>
             </div>
             <!-- Name + Pax -->
@@ -1928,7 +1950,7 @@ async function openVoucherModal(code) {
               </div>
               <div class="text-right">
                 <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Total Pax</div>
-                <div class="text-3xl font-black leading-none" style="color:#52b788">${(data.items || []).reduce((s, i) => s + i.quantity, 0)}<span class="text-sm ml-0.5 text-emerald-400">pax</span></div>
+                <div class="text-3xl font-black leading-none" style="color:#52b788">${item.quantity}<span class="text-sm ml-0.5 text-emerald-400">pax</span></div>
               </div>
             </div>
             <!-- Date Banner -->
@@ -1946,7 +1968,7 @@ async function openVoucherModal(code) {
               </div>
               <div class="flex-1">
                 <div class="text-[8px] uppercase tracking-[2px] text-emerald-500 font-bold mb-1">Voucher Code</div>
-                <div class="font-mono text-emerald-200 text-[11px] tracking-wider break-all">${data.voucher_code}</div>
+                <div class="font-mono text-emerald-200 text-[11px] tracking-wider break-all">${renderItem.itemVoucherCode}</div>
                 <div class="mt-2 text-[8px] uppercase tracking-[2px] text-emerald-600 font-semibold">Scan at Main Gate (North)</div>
               </div>
             </div>

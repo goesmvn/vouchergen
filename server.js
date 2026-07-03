@@ -380,11 +380,19 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
 app.get('/api/vouchers/:code', async (req, res) => {
   const { code } = req.params;
   try {
+    let baseCode = code;
+    let itemIndex = null;
+    const parts = code.split('-');
+    if (parts.length > 3) {
+      baseCode = parts.slice(0, 3).join('-');
+      itemIndex = parseInt(parts[3]) - 1; // 0-based index
+    }
+
     const invoice = await dbGet(
       `SELECT invoices.*
        FROM invoices
        WHERE invoices.voucher_code = ?`,
-      [code]
+      [baseCode]
     );
 
     if (!invoice) {
@@ -393,12 +401,38 @@ app.get('/api/vouchers/:code', async (req, res) => {
 
     invoice.items = JSON.parse(invoice.items || '[]');
 
-    const redemption = await dbGet('SELECT * FROM redemptions WHERE voucher_code = ?', [code]);
-    res.json({
-      ...invoice,
-      redeemed: !!redemption,
-      redeemed_at: redemption ? redemption.redeemed_at : null
-    });
+    // If no itemIndex (i.e. it's the main invoice code), find all redeemed items starting with this baseCode
+    if (itemIndex === null) {
+      const redemptions = await dbAll('SELECT voucher_code FROM redemptions WHERE voucher_code LIKE ?', [`${baseCode}%`]);
+      const redeemedItemsList = redemptions.map(r => r.voucher_code);
+      
+      // An invoice is fully redeemed if ALL items are redeemed
+      const allItemsRedeemed = invoice.items.length > 0 && invoice.items.every((item, idx) => 
+        redeemedItemsList.includes(`${baseCode}-${idx + 1}`)
+      );
+
+      res.json({
+        ...invoice,
+        redeemed: allItemsRedeemed || redeemedItemsList.includes(baseCode),
+        redeemed_items: redeemedItemsList
+      });
+    } else {
+      // It's a specific item code
+      const redemption = await dbGet('SELECT * FROM redemptions WHERE voucher_code = ?', [code]);
+      const item = invoice.items[itemIndex];
+      
+      if (!item) {
+        return res.status(404).json({ error: 'Ticket item index invalid.' });
+      }
+
+      res.json({
+        ...invoice,
+        voucher_code: code, // Override with the item-specific voucher code
+        items: [item],       // Only return the item being scanned
+        redeemed: !!redemption,
+        redeemed_at: redemption ? redemption.redeemed_at : null
+      });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -407,7 +441,15 @@ app.get('/api/vouchers/:code', async (req, res) => {
 app.post('/api/vouchers/:code/redeem', async (req, res) => {
   const { code } = req.params;
   try {
-    const invoice = await dbGet('SELECT * FROM invoices WHERE voucher_code = ?', [code]);
+    let baseCode = code;
+    let itemIndex = null;
+    const parts = code.split('-');
+    if (parts.length > 3) {
+      baseCode = parts.slice(0, 3).join('-');
+      itemIndex = parseInt(parts[3]) - 1; // 0-based index
+    }
+
+    const invoice = await dbGet('SELECT * FROM invoices WHERE voucher_code = ?', [baseCode]);
     if (!invoice) {
       return res.status(404).json({ error: 'Invalid voucher code.' });
     }
@@ -426,10 +468,18 @@ app.post('/api/vouchers/:code/redeem', async (req, res) => {
     await dbRun('INSERT INTO redemptions (voucher_code) VALUES (?)', [code]);
     invoice.items = JSON.parse(invoice.items || '[]');
 
+    let redeemedItems = invoice.items;
+    if (itemIndex !== null) {
+      const item = invoice.items[itemIndex];
+      if (item) {
+        redeemedItems = [item];
+      }
+    }
+
     res.json({
       message: 'Voucher successfully redeemed!',
       customer_name: invoice.customer_name,
-      items: invoice.items,
+      items: redeemedItems,
       redeemed_at: new Date().toISOString()
     });
   } catch (error) {
