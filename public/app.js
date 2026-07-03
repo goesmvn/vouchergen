@@ -1232,7 +1232,7 @@ function showBookingConfirm() {
       ${taxRate > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Tax / PPN (${taxRate}%)</span><span class="font-semibold">Rp ${taxAmt.toLocaleString('id-ID')}</span></div>` : ''}
       ${serviceFee > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Service Fee</span><span class="font-semibold">Rp ${serviceFee.toLocaleString('id-ID')}</span></div>` : ''}
       <div class="flex justify-between border-t border-outline-variant pt-2 mt-1"><span class="font-bold text-sm text-on-surface">Total</span><span class="font-black text-primary text-sm">Rp ${total.toLocaleString('id-ID')}</span></div>
-    </div>
+    </div>`;
   document.getElementById('booking-confirm-modal').classList.remove('hidden');
 }
 
