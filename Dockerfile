@@ -7,7 +7,7 @@ ENV PORT=3000
 ENV DB_PATH=/data/database.sqlite
 
 # Create data directory for SQLite persistence
-RUN mkdir -p /data && chown -R node:node /data
+RUN mkdir -p /data
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -21,12 +21,6 @@ RUN npm install --omit=dev --build-from-source
 # Copy application source files
 COPY server.js whatsapp.js ./
 COPY public/ ./public/
-
-# Change ownership of app directory
-RUN chown -R node:node /usr/src/app
-
-# Run as non-privileged node user
-USER node
 
 # Expose server port
 EXPOSE 3000

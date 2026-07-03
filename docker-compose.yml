@@ -7,7 +7,25 @@ services:
       - "3005:3000"
     environment:
       - DB_PATH=/data/database.sqlite
+      - CHATBOT_URL=http://chatbot:5000
     volumes:
-      - ./database.sqlite:/data/database.sqlite
+      - voucher-data:/data
       - ./public:/usr/src/app/public
+    depends_on:
+      - chatbot
+
+  chatbot:
+    build:
+      context: ./chatbot
+    container_name: voucher-chatbot
+    restart: always
+    ports:
+      - "5001:5000"
+    environment:
+      - DB_PATH=/data/database.sqlite
+    volumes:
+      - voucher-data:/data
+
+volumes:
+  voucher-data:
 
