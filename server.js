@@ -68,30 +68,33 @@ async function initializeDatabase() {
       // Column already exists, ignore
     }
 
+    // Recreate invoices table if it does not have 'items' column (for migration)
+    let dropInvoices = false;
+    try {
+      await dbGet('SELECT items FROM invoices LIMIT 1');
+    } catch (e) {
+      dropInvoices = true;
+    }
+
+    if (dropInvoices) {
+      console.log('Migrating invoices table to support multiple items...');
+      await dbRun('DROP TABLE IF EXISTS invoices');
+    }
+
     // Invoices Table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_name TEXT NOT NULL,
-        ticket_id INTEGER NOT NULL,
-        quantity INTEGER NOT NULL,
         total_price REAL NOT NULL,
         payment_method TEXT,
         status TEXT DEFAULT 'Unpaid',
         voucher_code TEXT UNIQUE,
         visit_date TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+        items TEXT NOT NULL
       )
     `);
-
-    // Safe migration: Add visit_date if missing
-    try {
-      await dbRun('ALTER TABLE invoices ADD COLUMN visit_date TEXT');
-      console.log('Added visit_date column to invoices.');
-    } catch (e) {
-      // Already exists, ignore
-    }
 
     // Redemptions Table (to track double scanning)
     await dbRun(`
@@ -293,14 +296,16 @@ app.delete('/api/tickets/:id', authenticateToken, async (req, res) => {
 app.get('/api/invoices', async (req, res) => {
   try {
     const query = `
-      SELECT invoices.*, tickets.title as ticket_title, tickets.price as ticket_price,
+      SELECT invoices.*,
       CASE WHEN redemptions.voucher_code IS NOT NULL THEN 'Redeemed' ELSE invoices.status END as current_status
       FROM invoices 
-      JOIN tickets ON invoices.ticket_id = tickets.id
       LEFT JOIN redemptions ON invoices.voucher_code = redemptions.voucher_code
       ORDER BY invoices.id DESC
     `;
     const rows = await dbAll(query);
+    rows.forEach(r => {
+      r.items = JSON.parse(r.items || '[]');
+    });
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -308,37 +313,48 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-  const { customerName, ticketId, quantity, paymentMethod, visitDate } = req.body;
-  if (!customerName || !ticketId || !quantity || !paymentMethod) {
+  const { customerName, items, paymentMethod, visitDate } = req.body;
+  if (!customerName || !items || !items.length || !paymentMethod) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
   try {
-    const ticket = await dbGet('SELECT * FROM tickets WHERE id = ?', [ticketId]);
-    if (!ticket) {
-      return res.status(404).json({ error: 'Ticket type not found' });
+    let totalPrice = 0;
+    const validatedItems = [];
+    for (const item of items) {
+      const ticket = await dbGet('SELECT * FROM tickets WHERE id = ?', [item.ticketId]);
+      if (!ticket) {
+        return res.status(404).json({ error: `Ticket type ${item.ticketId} not found` });
+      }
+      const itemTotalPrice = ticket.price * item.quantity;
+      totalPrice += itemTotalPrice;
+      validatedItems.push({
+        ticket_id: ticket.id,
+        ticket_title: ticket.title,
+        ticket_price: ticket.price,
+        quantity: item.quantity,
+        total_price: itemTotalPrice
+      });
     }
 
-    const totalPrice = ticket.price * quantity;
     // Generate unique code
     const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
     const voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
 
     const result = await dbRun(
-      'INSERT INTO invoices (customer_name, ticket_id, quantity, total_price, payment_method, status, voucher_code, visit_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [customerName, ticketId, quantity, totalPrice, paymentMethod, 'Unpaid', voucherCode, visitDate || null]
+      'INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, visit_date, items) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [customerName, totalPrice, paymentMethod, 'Unpaid', voucherCode, visitDate || null, JSON.stringify(validatedItems)]
     );
 
     res.status(201).json({
       id: result.id,
       customer_name: customerName,
-      ticket_title: ticket.title,
-      quantity,
       total_price: totalPrice,
       payment_method: paymentMethod,
       status: 'Unpaid',
       voucher_code: voucherCode,
-      visit_date: visitDate || null
+      visit_date: visitDate || null,
+      items: validatedItems
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -365,9 +381,8 @@ app.get('/api/vouchers/:code', async (req, res) => {
   const { code } = req.params;
   try {
     const invoice = await dbGet(
-      `SELECT invoices.*, tickets.title as ticket_title, tickets.price as ticket_price
+      `SELECT invoices.*
        FROM invoices
-       JOIN tickets ON invoices.ticket_id = tickets.id
        WHERE invoices.voucher_code = ?`,
       [code]
     );
@@ -375,6 +390,8 @@ app.get('/api/vouchers/:code', async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ error: 'Voucher code invalid or not found' });
     }
+
+    invoice.items = JSON.parse(invoice.items || '[]');
 
     const redemption = await dbGet('SELECT * FROM redemptions WHERE voucher_code = ?', [code]);
     res.json({
@@ -407,13 +424,12 @@ app.post('/api/vouchers/:code/redeem', async (req, res) => {
 
     // Insert redemption
     await dbRun('INSERT INTO redemptions (voucher_code) VALUES (?)', [code]);
-    const ticket = await dbGet('SELECT title FROM tickets WHERE id = ?', [invoice.ticket_id]);
+    invoice.items = JSON.parse(invoice.items || '[]');
 
     res.json({
       message: 'Voucher successfully redeemed!',
       customer_name: invoice.customer_name,
-      ticket_title: ticket.title,
-      quantity: invoice.quantity,
+      items: invoice.items,
       redeemed_at: new Date().toISOString()
     });
   } catch (error) {

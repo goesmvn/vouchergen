@@ -606,11 +606,15 @@ function renderDashboardStats() {
     if (isRedeemed) badge = `<span class="badge badge-redeemed">Redeemed</span>`;
     else if (isPaid) badge = `<span class="badge badge-paid">Paid</span>`;
 
+    const items = inv.items || [];
+    const firstItem = items[0] || { ticket_title: '-' };
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>#${inv.id}</td>
       <td><strong>${inv.customer_name}</strong></td>
-      <td>${inv.ticket_title}</td>
+      <td>${descText}</td>
       <td>${badge}</td>
       <td>${new Date(inv.created_at).toLocaleDateString('id-ID')}</td>
     `;
@@ -651,12 +655,17 @@ function renderOrdersTable() {
       `;
     }
 
+    const items = inv.items || [];
+    const firstItem = items[0] || { ticket_title: '-' };
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>#${inv.id}</td>
       <td><strong>${inv.customer_name}</strong></td>
-      <td>${inv.ticket_title}</td>
-      <td>${inv.quantity}</td>
+      <td>${descText}</td>
+      <td>${totalQty}</td>
       <td>Rp ${inv.total_price.toLocaleString('id-ID')}</td>
       <td>${inv.payment_method}</td>
       <td>${statusBadge}</td>
@@ -684,12 +693,17 @@ function renderInvoicesTable() {
     if (isRedeemed) statusBadge = `<span class="badge badge-redeemed">Redeemed</span>`;
     else if (isPaid) statusBadge = `<span class="badge badge-paid">Paid</span>`;
 
+    const items = inv.items || [];
+    const firstItem = items[0] || { ticket_title: '-' };
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>#${inv.id}</td>
       <td><strong>${inv.customer_name}</strong></td>
-      <td>${inv.ticket_title}</td>
-      <td>${inv.quantity}</td>
+      <td>${descText}</td>
+      <td>${totalQty}</td>
       <td>Rp ${inv.total_price.toLocaleString('id-ID')}</td>
       <td>${statusBadge}</td>
       <td>
@@ -720,12 +734,17 @@ function renderVouchersList() {
       ? `<span class="badge badge-redeemed">Redeemed</span>` 
       : `<span class="badge badge-paid">Paid (Active)</span>`;
 
+    const items = inv.items || [];
+    const firstItem = items[0] || { ticket_title: '-' };
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="font-code-mono">${inv.voucher_code}</td>
       <td><strong>${inv.customer_name}</strong></td>
-      <td>${inv.ticket_title}</td>
-      <td>${inv.quantity}</td>
+      <td>${descText}</td>
+      <td>${totalQty}</td>
       <td>${statusBadge}</td>
       <td>
         <button class="bg-primary text-on-primary py-1 px-3 rounded text-xs font-semibold hover:bg-surface-tint" onclick="openVoucherModal('${inv.voucher_code}')">View Ticket (QR)</button>
@@ -1067,7 +1086,7 @@ function updateBookingTotal() {
     }
     if (taxRate > 0) {
       rows += `<div class="flex justify-between items-center text-on-surface-variant">
-        <span class="text-xs font-semibold">PPN (${taxRate}%)</span>
+        <span class="text-xs font-semibold">Tax (${taxRate}%)</span>
         <span class="font-semibold">Rp ${taxAmt.toLocaleString('id-ID')}</span>
       </div>`;
     }
@@ -1147,7 +1166,7 @@ function renderCustomCalendar() {
     btn.type = 'button';
     btn.innerText = day;
 
-    let btnClass = 'w-full aspect-square flex items-center justify-center rounded-lg transition-all text-xs font-semibold ';
+    let btnClass = 'w-full aspect-square flex items-center justify-center rounded-full transition-all text-xs font-semibold ';
     if (isPast) {
       btnClass += 'text-outline/40 cursor-not-allowed bg-transparent';
       btn.disabled = true;
@@ -1186,9 +1205,41 @@ function changeCalendarMonth(direction) {
 function selectCalendarDate(dateObj) {
   const dateString = `${daysLong[dateObj.getDay()]}, ${dateObj.getDate()} ${monthsLong[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
   selectedBookingDateString = dateString;
+  
   const el = document.getElementById('selected-date-text');
   if (el) el.innerText = dateString;
+
+  const shortMonth = monthsLong[dateObj.getMonth()].slice(0, 3);
+  const m3Text = `${daysShort[dateObj.getDay()]}, ${dateObj.getDate()} ${shortMonth}`;
+  const m3El = document.getElementById('m3-calendar-selected-date');
+  if (m3El) m3El.innerText = m3Text;
+
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  const yyyy = dateObj.getFullYear();
+  const inputEl = document.getElementById('booking-date-input');
+  if (inputEl) inputEl.value = `${mm}/${dd}/${yyyy}`;
+
+  const dropdown = document.getElementById('calendar-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
 }
+
+// Global Calendar Dropdown Toggle
+window.toggleCalendarDropdown = function(event) {
+  if (event) event.stopPropagation();
+  const dropdown = document.getElementById('calendar-dropdown');
+  if (dropdown) {
+    dropdown.classList.toggle('hidden');
+  }
+};
+
+document.addEventListener('click', (event) => {
+  const dropdown = document.getElementById('calendar-dropdown');
+  const trigger = document.getElementById('booking-date-input');
+  if (dropdown && !dropdown.classList.contains('hidden') && trigger && !trigger.contains(event.target) && !dropdown.contains(event.target)) {
+    dropdown.classList.add('hidden');
+  }
+});
 
 function showBookingConfirm() {
   const customerName = document.getElementById('booking-customer-name').value.trim();
@@ -1229,7 +1280,7 @@ function showBookingConfirm() {
     <div class="bg-surface-container-low rounded-lg p-3 space-y-1 text-xs">
       <div class="flex justify-between"><span class="text-on-surface-variant">Subtotal</span><span class="font-semibold">Rp ${subtotal.toLocaleString('id-ID')}</span></div>
       ${discountRate > 0 ? `<div class="flex justify-between text-emerald-600"><span>${discLabel} (${discountRate}%)</span><span class="font-semibold">- Rp ${discountAmt.toLocaleString('id-ID')}</span></div>` : ''}
-      ${taxRate > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Tax / PPN (${taxRate}%)</span><span class="font-semibold">Rp ${taxAmt.toLocaleString('id-ID')}</span></div>` : ''}
+      ${taxRate > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Tax (${taxRate}%)</span><span class="font-semibold">Rp ${taxAmt.toLocaleString('id-ID')}</span></div>` : ''}
       ${serviceFee > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Service Fee</span><span class="font-semibold">Rp ${serviceFee.toLocaleString('id-ID')}</span></div>` : ''}
       <div class="flex justify-between border-t border-outline-variant pt-2 mt-1"><span class="font-bold text-sm text-on-surface">Total</span><span class="font-black text-primary text-sm">Rp ${total.toLocaleString('id-ID')}</span></div>
     </div>`;
@@ -1255,8 +1306,7 @@ async function processBookingSubmit(payDirectly = false) {
     if (qty > 0) {
       orderItems.push({
         ticketId: ticket.id,
-        quantity: qty,
-        ticket: ticket
+        quantity: qty
       });
     }
   });
@@ -1267,46 +1317,34 @@ async function processBookingSubmit(payDirectly = false) {
   }
 
   try {
-    const createdIds = [];
     closeBookingConfirm();
 
-    for (const item of orderItems) {
-      const response = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName,
-          ticketId: item.ticketId,
-          quantity: item.quantity,
-          paymentMethod,
-          visitDate: selectedBookingDateString || null
-        })
-      });
+    const response = await fetch('/api/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerName,
+        items: orderItems,
+        paymentMethod,
+        visitDate: selectedBookingDateString || null
+      })
+    });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to submit order');
-      createdIds.push(data.id);
-    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to submit order');
 
     // Auto-pay if user clicked "Bayar Langsung"
     if (payDirectly) {
-      for (const id of createdIds) {
-        await fetch('/api/invoices/' + id + '/pay', {
-          method: 'POST',
-          headers: { 'Authorization': token }
-        });
-      }
+      await fetch('/api/invoices/' + data.id + '/pay', {
+        method: 'POST',
+        headers: { 'Authorization': token }
+      });
     }
 
     showToast(payDirectly ? 'Pembayaran berhasil dikonfirmasi!' : 'Invoice berhasil dibuat!');
     resetBookingFlow();
     await loadInvoices();
-
-    if (createdIds.length === 1) {
-      openInvoiceDetails(createdIds[0]);
-    } else {
-      openMultiInvoiceDetails(createdIds);
-    }
+    openInvoiceDetails(data.id);
 
   } catch (err) {
     showToast(err.message, true);
@@ -1459,7 +1497,7 @@ async function openMultiInvoiceDetails(invoiceIds) {
               <span class="font-code-mono">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.taxRate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
-              <span>Tax / PPN (${p.taxRate}%):</span>
+              <span>Tax (${p.taxRate}%):</span>
               <span class="font-code-mono">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.serviceFee > 0 ? `<div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
@@ -1583,15 +1621,17 @@ async function openInvoiceDetails(invoiceId) {
               </tr>
             </thead>
             <tbody class="font-body-md text-body-md text-on-surface">
-              <tr class="border-b border-outline-variant hover:bg-surface transition-colors">
-                <td class="py-4 px-4">
-                  <div class="font-semibold">${inv.ticket_title}</div>
-                  <div class="text-on-surface-variant text-sm mt-1">Access to natural hot spring pools.</div>
-                </td>
-                <td class="py-4 px-4 text-right">Rp ${(inv.total_price / inv.quantity).toLocaleString('id-ID')}</td>
-                <td class="py-4 px-4 text-center">${inv.quantity}</td>
-                <td class="py-4 px-4 text-right font-code-mono">Rp ${inv.total_price.toLocaleString('id-ID')}</td>
-              </tr>
+              ${(inv.items || []).map(item => `
+                <tr class="border-b border-outline-variant hover:bg-surface transition-colors">
+                  <td class="py-4 px-4">
+                    <div class="font-semibold">${item.ticket_title}</div>
+                    <div class="text-on-surface-variant text-sm mt-1">Access to natural hot spring pools.</div>
+                  </td>
+                  <td class="py-4 px-4 text-right">Rp ${item.ticket_price.toLocaleString('id-ID')}</td>
+                  <td class="py-4 px-4 text-center">${item.quantity}</td>
+                  <td class="py-4 px-4 text-right font-code-mono">Rp ${item.total_price.toLocaleString('id-ID')}</td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         </div>
@@ -1618,7 +1658,7 @@ async function openInvoiceDetails(invoiceId) {
                 </div>` : ''}
                 ${p.taxRate > 0 ? `
                 <div class="flex justify-between font-body-md text-on-surface">
-                  <span>PPN (${p.taxRate}%):</span>
+                  <span>Tax (${p.taxRate}%):</span>
                   <span class="font-code-mono">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
                 </div>` : ''}
                 ${p.serviceFee > 0 ? `
@@ -1765,12 +1805,12 @@ async function openVoucherModal(code) {
             </div>
             <!-- Big ticket name -->
             <div class="px-6 pt-7 pb-3 text-center">
-              <div class="text-3xl font-extrabold text-on-surface leading-tight mb-1">${data.ticket_title}</div>
-              <div class="text-base font-semibold text-on-surface-variant mt-1">${data.customer_name}</div>
-              <div class="inline-flex items-center gap-1 mt-2 px-3 py-1 bg-surface-container rounded-full">
-                <span class="text-2xl font-black text-primary">${data.quantity}</span>
-                <span class="text-sm text-on-surface-variant font-semibold">Pax</span>
+              <div class="space-y-1 mb-2">
+                ${(data.items || []).map(i => `
+                  <div class="text-lg font-extrabold text-on-surface leading-tight">${i.ticket_title} <span class="text-primary">(x${i.quantity})</span></div>
+                `).join('')}
               </div>
+              <div class="text-sm font-semibold text-on-surface-variant mt-2">${data.customer_name}</div>
             </div>
             <!-- Visit date banner -->
             <div class="mx-5 mb-4 py-3 px-4 rounded-xl flex items-center justify-between" style="background:linear-gradient(135deg,#1a3d2b,#2d6a4f)">
@@ -1817,7 +1857,11 @@ async function openVoucherModal(code) {
               <!-- Row 2: Ticket type BIG -->
               <div class="px-5 py-4 border-b border-dashed border-emerald-200">
                 <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Jenis Tiket</div>
-                <div class="text-2xl font-black text-gray-900 leading-tight">${data.ticket_title}</div>
+                <div class="space-y-1">
+                  ${(data.items || []).map(i => `
+                    <div class="text-base font-extrabold text-gray-900 leading-tight">${i.ticket_title} <span class="text-emerald-700 font-black">(x${i.quantity})</span></div>
+                  `).join('')}
+                </div>
               </div>
               <!-- Row 3: 3-col info -->
               <div class="grid grid-cols-3 border-b border-dashed border-emerald-200">
@@ -1825,9 +1869,9 @@ async function openVoucherModal(code) {
                   <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Nama</div>
                   <div class="text-sm font-extrabold text-gray-900 leading-tight">${data.customer_name}</div>
                 </div>
-                <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center">
-                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Pax</div>
-                  <div class="text-3xl font-black text-emerald-700">${data.quantity}</div>
+                <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center justify-center">
+                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Total Pax</div>
+                  <div class="text-2xl font-black text-emerald-700">${(data.items || []).reduce((s, i) => s + i.quantity, 0)}</div>
                 </div>
                 <div class="px-4 py-3">
                   <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Gate</div>
@@ -1870,7 +1914,11 @@ async function openVoucherModal(code) {
             <!-- Big Ticket Name -->
             <div class="px-5 pt-5 pb-2">
               <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Jenis Tiket</div>
-              <div class="text-2xl font-black text-white leading-tight">${data.ticket_title}</div>
+              <div class="space-y-1">
+                ${(data.items || []).map(i => `
+                  <div class="text-base font-extrabold text-white leading-tight">${i.ticket_title} <span style="color:#52b788">(x${i.quantity})</span></div>
+                `).join('')}
+              </div>
             </div>
             <!-- Name + Pax -->
             <div class="px-5 pb-4 flex items-end gap-4">
@@ -1879,8 +1927,8 @@ async function openVoucherModal(code) {
                 <div class="text-base font-extrabold text-white">${data.customer_name}</div>
               </div>
               <div class="text-right">
-                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Jumlah</div>
-                <div class="text-4xl font-black leading-none" style="color:#52b788">${data.quantity}<span class="text-sm ml-0.5 text-emerald-400">pax</span></div>
+                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Total Pax</div>
+                <div class="text-3xl font-black leading-none" style="color:#52b788">${(data.items || []).reduce((s, i) => s + i.quantity, 0)}<span class="text-sm ml-0.5 text-emerald-400">pax</span></div>
               </div>
             </div>
             <!-- Date Banner -->
@@ -1989,9 +2037,13 @@ async function checkVoucherCode(code) {
     }
 
     // Populate Details
+    const items = data.items || [];
+    const ticketDesc = items.map(i => `${i.ticket_title} (x${i.quantity})`).join(', ');
+    const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
+
     document.getElementById('val-customer').innerText = data.customer_name;
-    document.getElementById('val-ticket').innerText = data.ticket_title;
-    document.getElementById('val-qty').innerText = `${data.quantity} Person(s)`;
+    document.getElementById('val-ticket').innerText = ticketDesc;
+    document.getElementById('val-qty').innerText = `${totalQty} Person(s)`;
     
     // Check status
     if (data.redeemed) {
