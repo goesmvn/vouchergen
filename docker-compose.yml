@@ -13,6 +13,9 @@ services:
       - ./public:/usr/src/app/public
     depends_on:
       - chatbot
+    networks:
+      - default
+      - dokploy-network
 
   chatbot:
     build:
@@ -25,6 +28,12 @@ services:
       - DB_PATH=/data/database.sqlite
     volumes:
       - voucher-data:/data
+    networks:
+      - default
+
+networks:
+  dokploy-network:
+    external: true
 
 volumes:
   voucher-data:
