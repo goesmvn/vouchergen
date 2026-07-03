@@ -299,19 +299,28 @@ def handle_message(sender, raw_text):
             log_activity(sender, raw_text, reply)
             return
             
-        # Step 5: Awaiting Final Confirmation
         elif session['step'] == 5:
             if text == 'ya':
+                import json
                 total_bill = int(session['ticket']['price']) * session['quantity']
                 # Generate unique voucher code mimicking Node.js code
                 random_hex = "".join(random.choices("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=6))
                 timestamp_sec = str(int(time.time()))[-6:]
                 voucher_code = f"VCH-{timestamp_sec}-{random_hex}"
                 
+                validated_items = [{
+                    "ticket_id": session['ticket']['id'],
+                    "ticket_title": session['ticket']['title'],
+                    "ticket_price": float(session['ticket']['price']),
+                    "quantity": session['quantity'],
+                    "total_price": total_bill
+                }]
+                items_json = json.dumps(validated_items)
+
                 try:
                     res = db_run(
-                        "INSERT INTO invoices (customer_name, ticket_id, quantity, total_price, payment_method, status, voucher_code) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (session['name'], session['ticket']['id'], session['quantity'], total_bill, session['paymentMethod'], 'Unpaid', voucher_code)
+                        "INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, items) VALUES (?, ?, ?, ?, ?, ?)",
+                        (session['name'], total_bill, session['paymentMethod'], 'Unpaid', voucher_code, items_json)
                     )
                     
                     # Clear session
