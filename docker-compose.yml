@@ -1,0 +1,13 @@
+services:
+  voucher-generator:
+    build: .
+    container_name: voucher-generator
+    restart: always
+    ports:
+      - "3005:3000"
+    environment:
+      - DB_PATH=/data/database.sqlite
+    volumes:
+      - ./database.sqlite:/data/database.sqlite
+      - ./public:/usr/src/app/public
+

@@ -1,0 +1,9 @@
+node_modules/
+database.sqlite
+whatsapp-debug.log
+chatbot/
+.npm/
+.npm-cache/
+auth_info_baileys/
+.gemini/
+.DS_Store
