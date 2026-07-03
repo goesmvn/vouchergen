@@ -213,10 +213,13 @@ const authenticateToken = (req, res, next) => {
 // Auth endpoint
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
+  console.log(`Login attempt: username="${username}", password="${password}"`);
   // Simple credential verification
   if (username === 'admin' && password === 'admin123') {
+    console.log('Login successful');
     res.json({ token: 'admin-secret-token', role: 'admin' });
   } else {
+    console.log(`Login failed: username match=${username === 'admin'}, password match=${password === 'admin123'}`);
     res.status(400).json({ error: 'Invalid username or password' });
   }
 });
