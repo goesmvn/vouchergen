@@ -226,6 +226,23 @@
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(8px);
     }
+
+    /* Mobile responsive sidebar and backdrop */
+    @media (max-width: 767px) {
+      .sidebar {
+        display: flex !important;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        z-index: 50 !important;
+      }
+      .sidebar.show {
+        transform: translateX(0);
+      }
+      .sidebar.show ~ #sidebar-backdrop {
+        display: block !important;
+      }
+    }
   </style>
 
   <!-- CDNs for QR Code Generation and Scanning -->
@@ -363,6 +380,9 @@
         </button>
       </div>
     </aside>
+
+    <!-- Sidebar Backdrop for Mobile -->
+    <div id="sidebar-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-black/40 z-40 md:hidden hidden"></div>
 
     <!-- Main Content Wrapper -->
     <div class="flex-1 flex flex-col md:ml-sidebar-width h-screen overflow-hidden">
