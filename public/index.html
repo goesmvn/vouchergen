@@ -289,6 +289,81 @@
         font-size: 0.75rem;
       }
     }
+
+    /* Button styles used in JS rendering */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      border: 1px solid transparent;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+    }
+    
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+    }
+    
+    .btn-primary {
+      background-color: var(--color-primary, #000000);
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+    
+    .btn-secondary {
+      background-color: #ffffff;
+      border-color: #c6c6cd;
+      color: #45464d;
+    }
+    .btn-secondary:hover {
+      background-color: #f8f9ff;
+      color: #0b1c30;
+    }
+    
+    .btn-success {
+      background-color: var(--color-secondary, #006c4a);
+      color: #ffffff;
+    }
+    .btn-success:hover {
+      opacity: 0.9;
+    }
+
+    .btn-card-detail {
+      background-color: #ffffff;
+      border: 1px solid #c6c6cd;
+      color: #45464d;
+      font-size: 0.85rem;
+      padding: 10px;
+    }
+    .btn-card-detail:hover {
+      color: #0b1c30;
+      background-color: #f8f9ff;
+    }
+
+    .btn-card-more {
+      background-color: #ffffff;
+      border: 1px solid #c6c6cd;
+      color: #45464d;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      transition: background 0.2s;
+    }
+    .btn-card-more:hover {
+      background-color: #f8f9ff;
+    }
   </style>
 
   <!-- CDNs for QR Code Generation and Scanning -->
@@ -469,7 +544,7 @@
       </header>
 
       <!-- Page Content -->
-      <main class="flex-1 overflow-y-auto p-margin md:p-xl bg-background relative">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-xl bg-background relative">
         
         <!-- Tab: Dashboard (Overview) -->
         <section id="panel-dashboard" class="w-full space-y-2xl max-w-[1600px] mx-auto fade-in hidden">
@@ -912,7 +987,7 @@
             <p class="font-body-md text-body-md text-on-surface-variant">View and manage customer invoices, print receipt sheets.</p>
           </div>
           
-          <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+          <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 sm:p-6 shadow-sm">
             <div class="table-container">
               <table class="w-full text-left border-collapse">
                 <thead>
@@ -941,7 +1016,7 @@
             <p class="font-body-md text-body-md text-on-surface-variant">View paid/active admission vouchers and print ticket cards directly.</p>
           </div>
           
-          <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+          <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 sm:p-6 shadow-sm">
             <div class="table-container">
               <table class="w-full text-left border-collapse">
                 <thead>
@@ -969,7 +1044,7 @@
             <p class="font-body-md text-body-md text-on-surface-variant">Review booking history and toggle invoice payment statuses.</p>
           </div>
           
-          <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+          <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 sm:p-6 shadow-sm">
             <div class="table-container">
               <table class="w-full text-left border-collapse">
                 <thead>
