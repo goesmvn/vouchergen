@@ -7,14 +7,22 @@ let appSettings = {};
 
 // Calc pricing breakdown from subtotal using current appSettings
 function calcPricing(subtotal) {
+  const discountType = appSettings.discount_type || 'percentage';
   const discountRate = parseFloat(appSettings.discount_rate) || 0;
   const taxRate = parseFloat(appSettings.tax_rate) || 0;
   const serviceFee = parseFloat(appSettings.service_fee) || 0;
-  const discountAmt = Math.round(subtotal * discountRate / 100);
-  const afterDiscount = subtotal - discountAmt;
+  
+  let discountAmt = 0;
+  if (discountType === 'percentage') {
+    discountAmt = Math.round(subtotal * discountRate / 100);
+  } else {
+    discountAmt = discountRate;
+  }
+  
+  const afterDiscount = Math.max(0, subtotal - discountAmt);
   const taxAmt = Math.round(afterDiscount * taxRate / 100);
   const total = afterDiscount + taxAmt + serviceFee;
-  return { subtotal, discountRate, discountAmt, taxRate, taxAmt, serviceFee, total };
+  return { subtotal, discountType, discountRate, discountAmt, taxRate, taxAmt, serviceFee, total };
 }
 
 
@@ -247,6 +255,7 @@ function setupEventListeners() {
         tax_rate: document.getElementById('settings-tax-rate').value.trim(),
         service_fee: document.getElementById('settings-service-fee').value.trim(),
         discount_rate: document.getElementById('settings-discount-rate').value.trim(),
+        discount_type: document.getElementById('settings-discount-type').value,
         discount_label: document.getElementById('settings-discount-label').value.trim()
       };
 
@@ -774,6 +783,8 @@ function renderSettingsForm() {
   document.getElementById('settings-tax-rate').value = appSettings.tax_rate || '0';
   document.getElementById('settings-service-fee').value = appSettings.service_fee || '0';
   document.getElementById('settings-discount-rate').value = appSettings.discount_rate || '0';
+  const discTypeEl = document.getElementById('settings-discount-type');
+  if (discTypeEl) discTypeEl.value = appSettings.discount_type || 'percentage';
   document.getElementById('settings-discount-label').value = appSettings.discount_label || 'Diskon';
 }
 
@@ -1011,9 +1022,9 @@ function renderBookingCatalog() {
         <span class="text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full w-fit">${categoryName}</span>
         <span class="font-bold text-primary text-sm mt-1">Rp ${ticket.price.toLocaleString('id-ID')}</span>
       </div>
-      <div class="flex items-center gap-3 bg-surface-container-high rounded-lg p-1.5 border border-outline-variant">
+      <div class="flex items-center gap-2 bg-surface-container-high rounded-lg p-1.5 border border-outline-variant">
         <button type="button" onclick="updateQty(${ticket.id}, -1)" class="w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-on-surface hover:bg-primary hover:text-on-primary active:scale-90 transition-all font-bold text-lg select-none">−</button>
-        <span id="qty-${ticket.id}" class="font-bold text-sm w-6 text-center select-none text-on-surface">0</span>
+        <input type="number" id="qty-${ticket.id}" class="font-bold text-sm w-12 text-center bg-transparent border-none focus:ring-0 p-0 text-on-surface hide-spin-button" value="0" min="0" max="999" onchange="setQtyDirect(${ticket.id}, this.value)" onkeydown="handleQtyKeydown(event, ${ticket.id})">
         <button type="button" onclick="updateQty(${ticket.id}, 1)" class="w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-on-surface hover:bg-primary hover:text-on-primary active:scale-90 transition-all font-bold text-lg select-none">+</button>
       </div>
     `;
@@ -1027,8 +1038,31 @@ function updateQty(ticketId, change) {
   if (bookingQuantities[ticketId] === undefined) return;
   const newVal = Math.max(0, bookingQuantities[ticketId] + change);
   bookingQuantities[ticketId] = newVal;
-  document.getElementById(`qty-${ticketId}`).innerText = newVal;
+  const inputEl = document.getElementById(`qty-${ticketId}`);
+  if (inputEl) inputEl.value = newVal;
   updateBookingTotal();
+}
+
+function setQtyDirect(ticketId, value) {
+  if (bookingQuantities[ticketId] === undefined) return;
+  let parsed = parseInt(value, 10);
+  if (isNaN(parsed) || parsed < 0) parsed = 0;
+  if (parsed > 999) parsed = 999; // Optional upper limit
+  
+  bookingQuantities[ticketId] = parsed;
+  const inputEl = document.getElementById(`qty-${ticketId}`);
+  if (inputEl) inputEl.value = parsed;
+  updateBookingTotal();
+}
+
+function handleQtyKeydown(event, ticketId) {
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    updateQty(ticketId, 1);
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    updateQty(ticketId, -1);
+  }
 }
 
 function updateBookingTotal() {
@@ -1043,13 +1077,22 @@ function updateBookingTotal() {
   });
 
   // Read per-transaction overrides (fall back to appSettings)
-  const discountRate = parseFloat(document.getElementById('checkout-discount')?.value) || parseFloat(appSettings.discount_rate) || 0;
+  const discInput = document.getElementById('checkout-discount')?.value;
+  const discountVal = discInput !== '' && discInput !== undefined ? parseFloat(discInput) : (parseFloat(appSettings.discount_rate) || 0);
+  const discTypeEl = document.getElementById('checkout-discount-type');
+  const discType = discTypeEl ? discTypeEl.value : (appSettings.discount_type || 'percentage');
+  
   const taxRate = parseFloat(document.getElementById('checkout-tax')?.value) || parseFloat(appSettings.tax_rate) || 0;
   const serviceFee = parseFloat(appSettings.service_fee) || 0;
   const discLabel = document.getElementById('checkout-discount-label')?.value.trim() || appSettings.discount_label || 'Diskon';
 
-  const discountAmt = Math.round(subtotal * discountRate / 100);
-  const afterDiscount = subtotal - discountAmt;
+  let discountAmt = 0;
+  if (discType === 'percentage') {
+    discountAmt = Math.round(subtotal * discountVal / 100);
+  } else {
+    discountAmt = discountVal;
+  }
+  const afterDiscount = Math.max(0, subtotal - discountAmt);
   const taxAmt = Math.round(afterDiscount * taxRate / 100);
   const total = afterDiscount + taxAmt + serviceFee;
 
@@ -1078,9 +1121,9 @@ function updateBookingTotal() {
       <span class="text-xs text-on-surface-variant font-semibold">Subtotal</span>
       <span class="font-semibold text-on-surface">Rp ${subtotal.toLocaleString('id-ID')}</span>
     </div>`;
-    if (discountRate > 0) {
+    if (discountVal > 0) {
       rows += `<div class="flex justify-between items-center text-emerald-600">
-        <span class="text-xs font-semibold">${discLabel} (${discountRate}%)</span>
+        <span class="text-xs font-semibold">${discLabel} ${discType === 'percentage' ? `(${discountVal}%)` : ''}</span>
         <span class="font-semibold">- Rp ${discountAmt.toLocaleString('id-ID')}</span>
       </div>`;
     }
@@ -1117,9 +1160,11 @@ function initVisitDateInput() {
 
   // Seed discount/tax from settings (only if not yet filled)
   const discEl = document.getElementById('checkout-discount');
+  const typeEl = document.getElementById('checkout-discount-type');
   const taxEl = document.getElementById('checkout-tax');
   const labelEl = document.getElementById('checkout-discount-label');
   if (discEl && !discEl.value) discEl.value = parseFloat(appSettings.discount_rate) || '';
+  if (typeEl && (!discEl || !discEl.value || typeEl.value === 'percentage')) typeEl.value = appSettings.discount_type || 'percentage';
   if (taxEl && !taxEl.value) taxEl.value = parseFloat(appSettings.tax_rate) || '';
   if (labelEl && !labelEl.value) labelEl.value = appSettings.discount_label || '';
   updateBookingTotal();
@@ -1254,12 +1299,19 @@ function showBookingConfirm() {
   });
   if (selectedItems.length === 0) { showToast('Please select at least 1 ticket!', true); return; }
 
-  const discountRate = parseFloat(document.getElementById('checkout-discount')?.value) || 0;
+  const discountVal = parseFloat(document.getElementById('checkout-discount')?.value) || 0;
+  const discType = document.getElementById('checkout-discount-type')?.value || 'percentage';
   const taxRate = parseFloat(document.getElementById('checkout-tax')?.value) || 0;
   const serviceFee = parseFloat(appSettings.service_fee) || 0;
   const discLabel = document.getElementById('checkout-discount-label')?.value.trim() || appSettings.discount_label || 'Discount';
-  const discountAmt = Math.round(subtotal * discountRate / 100);
-  const afterDiscount = subtotal - discountAmt;
+  
+  let discountAmt = 0;
+  if (discType === 'percentage') {
+    discountAmt = Math.round(subtotal * discountVal / 100);
+  } else {
+    discountAmt = discountVal;
+  }
+  const afterDiscount = Math.max(0, subtotal - discountAmt);
   const taxAmt = Math.round(afterDiscount * taxRate / 100);
   const total = afterDiscount + taxAmt + serviceFee;
 
@@ -1279,7 +1331,7 @@ function showBookingConfirm() {
     <div class="space-y-0">${itemRows}</div>
     <div class="bg-surface-container-low rounded-lg p-3 space-y-1 text-xs">
       <div class="flex justify-between"><span class="text-on-surface-variant">Subtotal</span><span class="font-semibold">Rp ${subtotal.toLocaleString('id-ID')}</span></div>
-      ${discountRate > 0 ? `<div class="flex justify-between text-emerald-600"><span>${discLabel} (${discountRate}%)</span><span class="font-semibold">- Rp ${discountAmt.toLocaleString('id-ID')}</span></div>` : ''}
+      ${discountVal > 0 ? `<div class="flex justify-between text-emerald-600"><span>${discLabel} ${discType === 'percentage' ? `(${discountVal}%)` : ''}</span><span class="font-semibold">- Rp ${discountAmt.toLocaleString('id-ID')}</span></div>` : ''}
       ${taxRate > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Tax (${taxRate}%)</span><span class="font-semibold">Rp ${taxAmt.toLocaleString('id-ID')}</span></div>` : ''}
       ${serviceFee > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Service Fee</span><span class="font-semibold">Rp ${serviceFee.toLocaleString('id-ID')}</span></div>` : ''}
       <div class="flex justify-between border-t border-outline-variant pt-2 mt-1"><span class="font-bold text-sm text-on-surface">Total</span><span class="font-black text-primary text-sm">Rp ${total.toLocaleString('id-ID')}</span></div>
@@ -1374,6 +1426,8 @@ async function openMultiInvoiceDetails(invoiceIds) {
 
     const payBtn = document.getElementById('modal-pay-btn');
     const viewVchBtn = document.getElementById('modal-view-vch-btn');
+    const pdfBtn = document.getElementById('modal-download-pdf-btn');
+    if (pdfBtn) pdfBtn.classList.add('hidden');
     payBtn.classList.add('hidden');
     viewVchBtn.classList.add('hidden');
 
@@ -1542,6 +1596,8 @@ async function openInvoiceDetails(invoiceId) {
     // Manage header action buttons
     const payBtn = document.getElementById('modal-pay-btn');
     const viewVchBtn = document.getElementById('modal-view-vch-btn');
+    const pdfBtn = document.getElementById('modal-download-pdf-btn');
+    if (pdfBtn) pdfBtn.classList.add('hidden');
 
     if (!isPaid && !isRedeemed) {
       payBtn.classList.remove('hidden');
@@ -1653,7 +1709,7 @@ async function openInvoiceDetails(invoiceId) {
                 </div>
                 ${p.discountRate > 0 ? `
                 <div class="flex justify-between font-body-md text-emerald-600">
-                  <span>${discLabel} (${p.discountRate}%):</span>
+                  <span>${discLabel} ${p.discountType === 'percentage' ? `(${p.discountRate}%)` : ''}:</span>
                   <span class="font-code-mono">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
                 </div>` : ''}
                 ${p.taxRate > 0 ? `
@@ -1759,6 +1815,11 @@ async function openVoucherModal(code) {
     // Manage header action buttons (hide both)
     document.getElementById('modal-pay-btn').classList.add('hidden');
     document.getElementById('modal-view-vch-btn').classList.add('hidden');
+    const pdfBtn = document.getElementById('modal-download-pdf-btn');
+    if (pdfBtn) {
+      pdfBtn.classList.remove('hidden');
+      pdfBtn.onclick = () => downloadVoucherPDF(allCodes.join(','));
+    }
 
     const templatePicker = `
       <div class="flex items-center justify-center gap-2 mb-6 no-print">
@@ -2007,6 +2068,295 @@ async function openVoucherModal(code) {
 // Print trigger function
 function printModalContent() {
   window.print();
+}
+
+// PDF Download function - generates PDF from voucher HTML using html2pdf.js
+async function downloadVoucherPDF(codes) {
+  if (!codes || codes.length === 0) {
+    showToast('No voucher code provided for PDF download', true);
+    return;
+  }
+
+  const codeArray = typeof codes === 'string' ? codes.split(',') : codes;
+  const codesToProcess = codeArray.map(c => c.trim()).filter(Boolean);
+  
+  if (codesToProcess.length === 0) {
+    showToast('Invalid voucher codes', true);
+    return;
+  }
+
+  try {
+    showToast('Preparing PDF...');
+    
+    // Fetch all voucher data
+    const vouchersList = await Promise.all(
+      codesToProcess.map(async (c) => {
+        const res = await fetch(`/api/vouchers/${c}`);
+        return res.ok ? res.json() : null;
+      })
+    );
+    let validVouchers = vouchersList.filter(Boolean);
+    
+    if (validVouchers.length === 0) throw new Error('Vouchers not found');
+
+    // Auto-detect siblings if only 1 code
+    if (codesToProcess.length === 1) {
+      const primary = validVouchers[0];
+      const siblings = invoiceCatalog.filter(inv =>
+        inv.customer_name === primary.customer_name &&
+        Math.abs(new Date(inv.created_at) - new Date(primary.created_at)) < 15000 &&
+        (inv.current_status === 'Paid' || inv.current_status === 'Redeemed')
+      );
+      const siblingCodes = siblings.map(s => s.voucher_code).filter(Boolean);
+      if (siblingCodes.length > 1) {
+        const remainingCodes = siblingCodes.filter(c => c !== primary.voucher_code);
+        const remainingVouchers = await Promise.all(
+          remainingCodes.map(async (c) => {
+            const res = await fetch(`/api/vouchers/${c}`);
+            return res.ok ? res.json() : null;
+          })
+        );
+        validVouchers = [primary, ...remainingVouchers.filter(Boolean)];
+      }
+    }
+
+    const allCodes = validVouchers.map(v => v.voucher_code);
+    
+    // Build ticket items
+    const itemsToRender = [];
+    validVouchers.forEach(invoice => {
+      const items = invoice.items || [];
+      items.forEach((item, index) => {
+        if (invoice.voucher_code.split('-').length > 3) {
+          itemsToRender.push({
+            invoice,
+            item,
+            itemVoucherCode: invoice.voucher_code,
+            isRedeemed: invoice.redeemed
+          });
+        } else {
+          const itemVoucherCode = `${invoice.voucher_code}-${index + 1}`;
+          itemsToRender.push({
+            invoice,
+            item,
+            itemVoucherCode,
+            isRedeemed: (invoice.redeemed_items || []).includes(itemVoucherCode) || invoice.redeemed
+          });
+        }
+      });
+    });
+
+    // Create temporary container for PDF generation
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '420px';
+    container.style.background = 'white';
+    container.style.padding = '0';
+    container.style.fontFamily = 'Inter, system-ui, sans-serif';
+    document.body.appendChild(container);
+
+    let ticketsHtml = '';
+    const merchantName = appSettings.merchant_name || 'Batur Hot Spring';
+    const logoUrl = appSettings.merchant_logo_url || '';
+    const website = appSettings.merchant_website || '';
+
+    itemsToRender.forEach(renderItem => {
+      const data = renderItem.invoice;
+      const item = renderItem.item;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=002114&data=${encodeURIComponent(renderItem.itemVoucherCode)}`;
+      const visitLabel = data.visit_date || new Date(data.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const isRedeemed = renderItem.isRedeemed;
+      const statusBadge = isRedeemed ? 'REDEEMED' : 'PAID / VALID';
+      const badgeClass = isRedeemed ? 'badge-redeemed' : 'badge-paid';
+      const bgImg = getVoucherBgImage(renderItem.itemVoucherCode);
+
+      // Template 1: Classic
+      if (activeVoucherTemplate === 1) {
+        ticketsHtml += `
+          <div class="relative z-10 w-full max-w-[380px] flex flex-col ticket-container shadow-[0px_10px_30px_rgba(0,33,20,0.15)] rounded-2xl bg-white border border-[#c6c6cd] overflow-hidden mb-8 last:mb-0 page-break-avoid" style="margin: 0 auto 32px auto;">
+            <div class="px-5 py-6 flex flex-col items-center text-center relative overflow-hidden" style="background:#1a3d2b">
+              <div class="absolute inset-0 bg-cover bg-center opacity-30" style="background-image:url('${bgImg}')"></div>
+              <div class="relative z-10 flex flex-col items-center">
+                ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="h-12 w-12 object-contain bg-white rounded-full p-1 mb-2 shadow">` : ''}
+                <p class="text-[10px] uppercase tracking-[3px] text-emerald-300 font-bold mb-1">Official Admission Ticket</p>
+                <h2 class="text-white font-extrabold text-lg tracking-tight">${merchantName}</h2>
+              </div>
+            </div>
+            <div class="relative h-0 flex items-center justify-center">
+              <div class="w-full border-t border-dashed border-[#c6c6cd]"></div>
+              <div class="absolute -left-3 w-6 h-6 rounded-full bg-[#f8f9ff] border border-[#c6c6cd]"></div>
+              <div class="absolute -right-3 w-6 h-6 rounded-full bg-[#f8f9ff] border border-[#c6c6cd]"></div>
+            </div>
+            <div class="px-6 pt-7 pb-3 text-center">
+              <div class="space-y-1 mb-2">
+                <div class="text-lg font-extrabold text-[#0b1c30] leading-tight">${item.ticket_title} <span class="text-[#000000]">(x${item.quantity})</span></div>
+              </div>
+              <div class="text-sm font-semibold text-[#45464d] mt-2">${data.customer_name}</div>
+            </div>
+            <div class="mx-5 mb-4 py-3 px-4 rounded-xl flex items-center justify-between" style="background:linear-gradient(135deg,#1a3d2b,#2d6a4f)">
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Tanggal Kunjungan</div>
+                <div class="text-white font-extrabold text-sm mt-0.5">${visitLabel}</div>
+              </div>
+              <span class="material-symbols-outlined text-emerald-300" style="font-size:28px;font-variation-settings:'FILL' 1">calendar_month</span>
+            </div>
+            <div class="flex flex-col items-center pb-5 px-6">
+              <div class="bg-white rounded-xl border border-[#c6c6cd] p-2 shadow-sm mb-3">
+                <img src="${qrCodeUrl}" alt="QR" class="w-[120px] h-[120px] object-contain">
+              </div>
+              <div class="font-mono text-xs text-[#45464d] tracking-wider">${renderItem.itemVoucherCode}</div>
+              <span class="mt-2 badge ${badgeClass} text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">${statusBadge}</span>
+            </div>
+            <div class="border-t border-dashed border-[#c6c6cd] px-5 py-3 flex flex-col items-center gap-0.5 bg-[#eff4ff]">
+              <p class="text-[9px] text-[#45464d] uppercase tracking-[2px] font-semibold">Non-transferable • Scan at Entrance</p>
+              ${website ? `<p class="text-[9px] text-[#000000]/60 font-semibold">${website}</p>` : ''}
+            </div>
+          </div>
+        `;
+      } 
+      // Template 2: Boarding Pass
+      else if (activeVoucherTemplate === 2) {
+        ticketsHtml += `
+          <div class="relative z-10 w-full max-w-[420px] flex flex-col shadow-[0px_8px_32px_rgba(0,0,0,0.18)] rounded-2xl overflow-hidden mb-8 last:mb-0 page-break-avoid" style="background:#f0fdf4;margin:0 auto 32px auto;">
+            <div class="h-2 w-full" style="background:linear-gradient(90deg,#1a3d2b,#40916c,#74c69d)"></div>
+            <div class="flex flex-col p-0">
+              <div class="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-dashed border-emerald-200">
+                ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="h-10 w-10 object-contain bg-white rounded-full p-1 border border-emerald-200 shadow-sm flex-shrink-0">` : ''}
+                <div>
+                  <div class="text-[9px] uppercase tracking-[3px] text-emerald-700 font-bold">Official Boarding Pass</div>
+                  <div class="font-extrabold text-base text-gray-800">${merchantName}</div>
+                </div>
+                <div class="ml-auto">
+                  <span class="badge ${badgeClass} text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">${statusBadge}</span>
+                </div>
+              </div>
+              <div class="px-5 py-4 border-b border-dashed border-emerald-200">
+                <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Jenis Tiket</div>
+                <div class="space-y-1">
+                  <div class="text-base font-extrabold text-gray-900 leading-tight">${item.ticket_title} <span class="text-emerald-700 font-black">(x${item.quantity})</span></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 border-b border-dashed border-emerald-200">
+                <div class="px-4 py-3 border-r border-dashed border-emerald-200">
+                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Nama</div>
+                  <div class="text-sm font-extrabold text-gray-900 leading-tight">${data.customer_name}</div>
+                </div>
+                <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center justify-center">
+                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Total Pax</div>
+                  <div class="text-2xl font-black text-emerald-700">${item.quantity}</div>
+                </div>
+                <div class="px-4 py-3">
+                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Gate</div>
+                  <div class="text-sm font-extrabold text-gray-900">Main Gate</div>
+                  <div class="text-[10px] text-emerald-600">(North)</div>
+                </div>
+              </div>
+              <div class="flex items-stretch">
+                <div class="flex-1 px-5 py-5" style="background:linear-gradient(135deg,#1a3d2b 0%,#2d6a4f 100%)">
+                  <div class="text-[9px] uppercase tracking-[3px] text-emerald-300 font-bold mb-2">📅 Tanggal Kunjungan</div>
+                  <div class="text-white font-black text-xl leading-tight">${visitLabel}</div>
+                  <div class="mt-3 font-mono text-emerald-300 text-[10px] tracking-wider">${renderItem.itemVoucherCode}</div>
+                </div>
+                <div class="flex flex-col items-center justify-center px-4 py-4 border-l border-dashed border-emerald-200 bg-white">
+                  <img src="${qrCodeUrl}" alt="QR" class="w-[100px] h-[100px] object-contain">
+                  <div class="text-[8px] text-gray-400 mt-1 uppercase tracking-wider">Scan QR</div>
+                </div>
+              </div>
+            </div>
+            <div class="h-1.5 w-full" style="background:linear-gradient(90deg,#74c69d,#40916c,#1a3d2b)"></div>
+          </div>
+        `;
+      } 
+      // Template 3: Minimal
+      else {
+        ticketsHtml += `
+          <div class="relative z-10 w-full max-w-[360px] shadow-[0px_12px_40px_rgba(0,0,0,0.35)] rounded-2xl overflow-hidden mb-8 last:mb-0 page-break-avoid" style="background:#0f1f17;margin:0 auto 32px auto;">
+            <div class="h-1 w-full" style="background:linear-gradient(90deg,#52b788,#95d5b2,#52b788)"></div>
+            <div class="flex items-center gap-3 px-5 pt-5 pb-4 border-b" style="border-color:#1f3329">
+              ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="h-9 w-9 object-contain bg-white/10 rounded-full p-1">` : ''}
+              <div class="flex-1">
+                <div class="text-[8px] uppercase tracking-[3px] text-emerald-400 font-bold">${merchantName}</div>
+                <div class="text-[10px] text-emerald-200 font-semibold">Admission Ticket</div>
+              </div>
+              <span class="badge ${badgeClass} text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">${statusBadge}</span>
+            </div>
+            <div class="px-5 pt-5 pb-2">
+              <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Jenis Tiket</div>
+              <div class="space-y-1">
+                <div class="text-base font-extrabold text-white leading-tight">${item.ticket_title} <span style="color:#52b788">(x${item.quantity})</span></div>
+              </div>
+            </div>
+            <div class="px-5 pb-4 flex items-end gap-4">
+              <div class="flex-1">
+                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Nama Pengunjung</div>
+                <div class="text-base font-extrabold text-white">${data.customer_name}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Total Pax</div>
+                <div class="text-3xl font-black leading-none" style="color:#52b788">${item.quantity}<span class="text-sm ml-0.5 text-emerald-400">pax</span></div>
+              </div>
+            </div>
+            <div class="mx-4 mb-4 rounded-xl px-4 py-3 flex items-center gap-3" style="background:#1a3d2b;border:1px solid #2d6a4f">
+              <span class="material-symbols-outlined" style="color:#52b788;font-size:32px;font-variation-settings:'FILL' 1">event_available</span>
+              <div>
+                <div class="text-[8px] uppercase tracking-widest text-emerald-500 font-bold">Tanggal Kunjungan</div>
+                <div class="text-white font-extrabold text-sm">${visitLabel}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-4 px-5 pb-5">
+              <div class="bg-white rounded-lg p-1.5 shadow">
+                <img src="${qrCodeUrl}" alt="QR" class="w-[90px] h-[90px] object-contain">
+              </div>
+              <div class="flex-1">
+                <div class="text-[8px] uppercase tracking-[2px] text-emerald-500 font-bold mb-1">Voucher Code</div>
+                <div class="font-mono text-emerald-200 text-[11px] tracking-wider break-all">${renderItem.itemVoucherCode}</div>
+                <div class="mt-2 text-[8px] uppercase tracking-[2px] text-emerald-600 font-semibold">Scan at Main Gate (North)</div>
+              </div>
+            </div>
+            <div class="border-t px-5 py-2.5 flex items-center justify-between" style="border-color:#1f3329">
+              <p class="text-[8px] text-emerald-600 uppercase tracking-widest">Non-transferable</p>
+              ${website ? `<p class="text-[8px] text-emerald-600 font-semibold">${website}</p>` : ''}
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    container.innerHTML = `
+      <div class="flex flex-col items-center justify-start p-4 md:p-6 relative overflow-auto bg-white min-h-full">
+        <div class="relative z-10 w-full flex flex-col items-center">
+          ${ticketsHtml}
+        </div>
+      </div>
+    `;
+
+    // Wait for Tailwind CDN to process the newly added classes
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Generate PDF
+    const opt = {
+      margin: 0,
+      filename: `Voucher-${allCodes.join('-')}.pdf`,
+      image: { type: 'jpeg', quality: 1.0 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+      jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+    };
+
+    await html2pdf().set(opt).from(container).save();
+    
+    // Clean up
+    document.body.removeChild(container);
+    showToast('PDF downloaded successfully!');
+    
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    showToast('Failed to generate PDF: ' + err.message, true);
+    // Try to clean up
+    const tempContainer = document.querySelector('div[style*="left: -9999px"]');
+    if (tempContainer) document.body.removeChild(tempContainer);
+  }
 }
 
 // Helper to confirm payment from inside the detail modal

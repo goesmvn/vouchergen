@@ -2,7 +2,7 @@
 <html class="light" lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="GreenLeaf Park Voucher Management System. Generate, print, and scan tickets securely.">
   <title>Batur Hot Spring & GreenLeaf Park Voucher Admin</title>
   <!-- Tailwind CSS CDN -->
@@ -235,6 +235,8 @@
         transition: transform 0.3s ease-in-out;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         z-index: 50 !important;
+        padding-top: calc(1.5rem + env(safe-area-inset-top)) !important;
+        padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
       }
       .sidebar.show {
         transform: translateX(0);
@@ -368,9 +370,10 @@
 
   <!-- CDNs for QR Code Generation and Scanning -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode" defer></script>
-</head>
-<body class="bg-surface text-on-surface font-body-md selection:bg-secondary-container selection:text-on-secondary-container h-screen overflow-hidden flex">
+  
+  <body class="bg-surface text-on-surface font-body-md selection:bg-secondary-container selection:text-on-secondary-container h-[100dvh] overflow-hidden flex">
 
   <!-- Background Decorative Orbs -->
   <div class="absolute inset-0 bg-surface-container-low z-0 overflow-hidden no-print">
@@ -406,7 +409,7 @@
   <!-- MAIN SIDEBAR INTERFACE CONTAINER -->
   <div id="dashboard-section" class="w-full h-full flex relative z-10 hidden">
     <!-- Sidebar Navigation -->
-    <aside class="hidden md:flex flex-col h-screen py-lg px-md bg-surface-container-low border-r border-outline-variant w-sidebar-width fixed left-0 top-0 h-screen z-40 sidebar no-print">
+    <aside class="hidden md:flex flex-col h-[100dvh] py-lg px-md bg-surface-container-low border-r border-outline-variant w-sidebar-width fixed left-0 top-0 h-[100dvh] z-40 sidebar no-print">
       <div class="flex items-center gap-sm mb-2xl px-sm">
         <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white overflow-hidden" id="sidebar-logo-container">
           <span class="material-symbols-outlined text-white" id="sidebar-logo-icon" style="font-variation-settings: 'FILL' 1;">landscape</span>
@@ -460,6 +463,17 @@
           </div>
         </div>
 
+        <!-- Helpdesk Section -->
+        <div>
+          <p class="px-md text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-xs">Helpdesk Support</p>
+          <div class="space-y-xs">
+            <button id="tab-btn-helpdesk" onclick="switchTab('helpdesk')" class="w-full flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:text-secondary hover:bg-surface-container-high transition-all duration-200 ease-in-out text-left">
+              <span class="material-symbols-outlined">support_agent</span>
+              <span class="font-label-md text-label-md">Live Chat & Tickets</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Master Section -->
         <div>
           <p class="px-md text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-xs">Master Data</p>
@@ -506,10 +520,10 @@
     <div id="sidebar-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-black/40 z-40 md:hidden hidden"></div>
 
     <!-- Main Content Wrapper -->
-    <div class="flex-1 flex flex-col md:ml-sidebar-width h-screen overflow-hidden">
+    <div class="flex-1 flex flex-col md:ml-sidebar-width h-[100dvh] overflow-hidden">
       
       <!-- TopNavBar -->
-      <header class="flex items-center justify-between px-container-padding w-full h-16 bg-surface border-b border-outline-variant shadow-sm sticky top-0 z-30 print-hidden no-print">
+      <header class="flex items-center justify-between px-container-padding w-full h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-surface border-b border-outline-variant shadow-sm sticky top-0 z-30 print-hidden no-print">
         <div class="flex items-center gap-lg flex-1">
           <button onclick="toggleMobileSidebar()" aria-label="Toggle Sidebar" class="md:hidden text-on-surface-variant hover:text-primary transition-colors focus:outline-none">
             <span class="material-symbols-outlined text-2xl">menu</span>
@@ -879,12 +893,15 @@
                     <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Price Adjustments</p>
                     <div class="grid grid-cols-2 gap-3">
                       <div class="flex flex-col gap-1">
-                        <label for="checkout-discount" class="text-[10px] uppercase font-bold text-on-surface-variant">Discount (%)</label>
-                        <div class="relative">
-                          <input type="number" id="checkout-discount" min="0" max="100" step="0.5" placeholder="0"
-                            class="w-full px-3 py-2 pr-7 border border-outline-variant rounded-lg text-sm focus:outline-none focus:border-primary bg-surface-container-lowest"
+                        <label for="checkout-discount" class="text-[10px] uppercase font-bold text-on-surface-variant">Discount</label>
+                        <div class="flex gap-1">
+                          <select id="checkout-discount-type" class="w-[60px] px-2 py-2 border border-outline-variant rounded-lg text-xs focus:outline-none focus:border-primary bg-surface-container-lowest" onchange="updateBookingTotal()">
+                            <option value="percentage">%</option>
+                            <option value="nominal">Rp</option>
+                          </select>
+                          <input type="number" id="checkout-discount" min="0" step="0.5" placeholder="0"
+                            class="flex-1 min-w-0 px-3 py-2 border border-outline-variant rounded-lg text-sm focus:outline-none focus:border-primary bg-surface-container-lowest"
                             oninput="updateBookingTotal()">
-                          <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-on-surface-variant font-bold">%</span>
                         </div>
                       </div>
                       <div class="flex flex-col gap-1">
@@ -1226,10 +1243,13 @@
 
                   <!-- Discount Rate -->
                   <div class="flex flex-col gap-1.5">
-                    <label for="settings-discount-rate" class="text-xs font-bold uppercase text-on-surface-variant">Diskon Global (%)</label>
-                    <div class="relative">
-                      <input type="number" id="settings-discount-rate" min="0" max="100" step="0.5" placeholder="0" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary pr-10">
-                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm font-bold">%</span>
+                    <label for="settings-discount-rate" class="text-xs font-bold uppercase text-on-surface-variant">Diskon Global</label>
+                    <div class="flex gap-2">
+                      <select id="settings-discount-type" class="w-1/4 px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm bg-white">
+                        <option value="percentage">Persen (%)</option>
+                        <option value="nominal">Nominal (Rp)</option>
+                      </select>
+                      <input type="number" id="settings-discount-rate" min="0" step="0.5" placeholder="0" class="w-3/4 px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
                     </div>
                     <span class="text-[10px] text-on-surface-variant">0 = tidak ada diskon. Berlaku sebelum pajak dihitung.</span>
                   </div>
@@ -1358,6 +1378,84 @@
                   <p class="text-secondary text-center text-xs py-8">No chat activity yet.</p>
                 </div>
               </div>            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Helpdesk Support (Live Chat & Ticketing) -->
+        <section id="panel-helpdesk" class="w-full flex flex-col space-y-md max-w-[1600px] mx-auto fade-in hidden">
+          <div>
+            <h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Helpdesk & Support Center</h2>
+            <p class="font-body-md text-body-md text-on-surface-variant">Pantau chat WhatsApp, kelola tiket bantuan pelanggan, dan alihkan respon otomatis ke agen manual.</p>
+          </div>
+
+          <div class="flex-grow flex bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden h-[550px] min-h-[500px]">
+            <!-- Left Panel: Chat list / Inbox -->
+            <div class="w-80 border-r border-outline-variant flex flex-col bg-surface-container-low flex-shrink-0">
+              <div class="p-4 border-b border-outline-variant">
+                <input type="text" id="helpdesk-chat-search" oninput="filterHelpdeskChats()" placeholder="Cari nomor/nama..." class="w-full px-3 py-2 border border-outline-variant rounded-lg text-xs focus:outline-none bg-surface-container-lowest">
+              </div>
+              <div id="helpdesk-chat-list" class="flex-grow overflow-y-auto divide-y divide-outline-variant">
+                <p class="text-xs text-on-surface-variant text-center py-8">Memuat obrolan...</p>
+              </div>
+            </div>
+
+            <!-- Right Panel: Conversation Detail -->
+            <div id="helpdesk-detail-panel" class="flex-grow flex flex-col bg-surface-container-lowest">
+              <!-- Chat empty state -->
+              <div id="helpdesk-empty-state" class="flex-grow flex flex-col items-center justify-center text-center p-8 space-y-3">
+                <span class="material-symbols-outlined text-outline text-[48px]">chat</span>
+                <h4 class="font-bold text-sm text-on-surface">Percakapan Belum Dipilih</h4>
+                <p class="text-xs text-on-surface-variant max-w-xs">Pilih salah satu nomor obrolan di sebelah kiri untuk melihat pesan dan mulai melayani pelanggan.</p>
+              </div>
+
+              <!-- Chat window (hidden by default) -->
+              <div id="helpdesk-chat-window" class="flex-grow flex flex-col h-full hidden">
+                <!-- Header -->
+                <div class="px-6 py-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low flex-shrink-0">
+                  <div>
+                    <h3 id="helpdesk-chat-name" class="font-bold text-sm text-on-surface">WhatsApp Customer</h3>
+                    <p id="helpdesk-chat-phone" class="text-xs text-on-surface-variant">+62 812-3456-7890</p>
+                  </div>
+                  
+                  <!-- Helpdesk Status Badges & Controls -->
+                  <div class="flex items-center gap-3">
+                    <!-- Bot Toggle Control -->
+                    <div class="flex items-center gap-1.5 bg-surface-container-lowest border border-outline-variant px-2.5 py-1.5 rounded-lg shadow-sm">
+                      <span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Bot:</span>
+                      <button id="helpdesk-toggle-bot-btn" onclick="toggleChatbotMode()" class="badge cursor-pointer hover:opacity-80 transition-opacity">Auto (Bot)</button>
+                    </div>
+
+                    <!-- Ticket Toggle Control -->
+                    <div class="flex items-center gap-1.5 bg-surface-container-lowest border border-outline-variant px-2.5 py-1.5 rounded-lg shadow-sm">
+                      <span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Tiket:</span>
+                      <button id="helpdesk-toggle-ticket-btn" onclick="toggleTicketStatus()" class="badge cursor-pointer hover:opacity-80 transition-opacity">Open</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Chat History Area -->
+                <div id="helpdesk-chat-history" class="flex-grow p-6 overflow-y-auto bg-surface-container-lowest space-y-4 max-h-[380px]">
+                  <!-- Populated dynamically with bubbles -->
+                </div>
+
+                <!-- Template quick actions / responses -->
+                <div class="px-6 py-2 border-t border-outline-variant bg-surface-container-low flex flex-wrap gap-2 items-center flex-shrink-0">
+                  <span class="text-[10px] uppercase font-bold text-on-surface-variant">Pintasan Balasan:</span>
+                  <button onclick="sendQuickReply('Halo! Ada yang bisa kami bantu? 😊')" class="text-[10px] bg-surface-container-lowest hover:bg-surface-dim border border-outline-variant px-2 py-1 rounded text-on-surface transition-colors">Sapaan</button>
+                  <button onclick="sendQuickReply('Lokasi kami di Toya Bungkah, Kintamani, Bali. Jam buka: 07:00 - 19:00 WITA.')" class="text-[10px] bg-surface-container-lowest hover:bg-surface-dim border border-outline-variant px-2 py-1 rounded text-on-surface transition-colors">Lokasi & Jam</button>
+                  <button onclick="sendQuickReply('Daftar tiket kami: Dewasa Rp 150k, Anak Rp 90k, Pelajar Rp 120k. Ketik PESAN untuk memesan.')" class="text-[10px] bg-surface-container-lowest hover:bg-surface-dim border border-outline-variant px-2 py-1 rounded text-on-surface transition-colors">Harga Tiket</button>
+                  <button onclick="resolveHelpdeskTicket()" class="text-[10px] bg-secondary text-on-secondary px-2.5 py-1 rounded hover:opacity-95 transition-all">Selesaikan Tiket & Aktifkan Bot</button>
+                </div>
+
+                <!-- Input area -->
+                <form id="helpdesk-chat-form" onsubmit="sendHelpdeskMessage(event)" class="px-6 py-4 border-t border-outline-variant bg-surface-container-low flex gap-3 flex-shrink-0">
+                  <input type="text" id="helpdesk-message-input" placeholder="Ketik balasan Anda ke pelanggan..." required class="flex-grow px-3 py-2.5 border border-outline-variant rounded-lg text-xs focus:outline-none bg-surface-container-lowest">
+                  <button type="submit" class="bg-primary text-on-primary px-5 py-2.5 rounded-lg font-bold text-xs hover:bg-surface-tint active:scale-95 transition-all flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">send</span> Kirim
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </section>
         

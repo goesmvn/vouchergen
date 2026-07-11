@@ -36,6 +36,25 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chatbot_sessions (
+            phone TEXT PRIMARY KEY,
+            step INTEGER DEFAULT 0,
+            timestamp REAL,
+            name TEXT,
+            ticket_id INTEGER,
+            quantity INTEGER,
+            payment_method TEXT,
+            bot_mode TEXT DEFAULT 'bot',
+            ticket_status TEXT DEFAULT 'closed',
+            ticket_subject TEXT,
+            lang TEXT DEFAULT 'id'
+        )
+    """)
+    try:
+        cursor.execute("ALTER TABLE chatbot_sessions ADD COLUMN lang TEXT DEFAULT 'id'")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -79,16 +98,86 @@ def db_run(query, params=()):
     conn.close()
     return {"id": last_id, "changes": changes}
 
-# Chatbot Session Store
-# phone -> {step: int, timestamp: float, name: str, ticket: dict, quantity: int, paymentMethod: str, availableTickets: list}
-SESSIONS = {}
+# Chatbot Session Helpers (Database-Backed)
 SESSION_TIMEOUT = 5 * 60  # 5 minutes
+
+def clean_phone(phone):
+    return phone.replace('@s.whatsapp.net', '').replace('@c.us', '').strip()
+
+def get_session(phone):
+    cleaned = clean_phone(phone)
+    row = db_get("SELECT * FROM chatbot_sessions WHERE phone = ?", (cleaned,))
+    if not row:
+        return None
+    session = {
+        'step': row['step'],
+        'timestamp': row['timestamp'],
+        'name': row['name'],
+        'paymentMethod': row['payment_method'],
+        'bot_mode': row['bot_mode'],
+        'ticket_status': row['ticket_status'],
+        'ticket_subject': row['ticket_subject'],
+        'lang': row.get('lang', 'id')
+    }
+    if row['ticket_id']:
+        ticket = db_get("SELECT * FROM tickets WHERE id = ?", (row['ticket_id'],))
+        session['ticket'] = ticket
+    else:
+        session['ticket'] = None
+    session['quantity'] = row['quantity']
+    
+    # Load available tickets
+    tickets = db_all("SELECT * FROM tickets WHERE is_active = 1")
+    session['availableTickets'] = tickets
+    
+    # Load payment methods
+    active_payments = db_all("SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY name ASC")
+    if not active_payments:
+        active_payments = [{'name': 'Tunai'}, {'name': 'Transfer Bank'}, {'name': 'QRIS'}]
+    session['availablePayments'] = active_payments
+    return session
+
+def save_session(phone, session):
+    cleaned = clean_phone(phone)
+    ticket_id = session.get('ticket', {}).get('id') if session.get('ticket') else None
+    db_run(
+        """INSERT OR REPLACE INTO chatbot_sessions 
+           (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            cleaned,
+            session.get('step', 0),
+            session.get('timestamp', time.time()),
+            session.get('name'),
+            ticket_id,
+            session.get('quantity'),
+            session.get('paymentMethod'),
+            session.get('bot_mode', 'bot'),
+            session.get('ticket_status', 'open'),
+            session.get('ticket_subject'),
+            session.get('lang', 'id')
+        )
+    )
+
+def delete_session(phone):
+    cleaned = clean_phone(phone)
+    db_run(
+        """UPDATE chatbot_sessions 
+           SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL 
+           WHERE phone = ?""",
+        (cleaned,)
+    )
 
 def clear_expired_sessions():
     now = time.time()
-    expired = [k for k, v in SESSIONS.items() if now - v.get('timestamp', 0) > SESSION_TIMEOUT]
-    for k in expired:
-        del SESSIONS[k]
+    expired_rows = db_all("SELECT phone FROM chatbot_sessions WHERE step > 0 AND ? - timestamp > ?", (now, SESSION_TIMEOUT))
+    for r in expired_rows:
+        db_run(
+            """UPDATE chatbot_sessions 
+               SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL 
+               WHERE phone = ?""",
+            (r['phone'],)
+        )
 
 # Pure Python Cosine Similarity & TF-IDF for RAG
 def tokenize(text):
@@ -166,6 +255,172 @@ def log_activity(phone, message, reply):
         (phone.replace('@s.whatsapp.net', '').replace('@c.us', ''), message, reply)
     )
 
+# Translation dictionary for multi-language support
+T = {
+    'welcome': {
+        'id': "Halo! Selamat datang di WhatsApp *{merchant_name}*. ada yang bisa kami bantu? 😊\n\n"
+              "Silakan ketik nomor pilihan berikut:\n"
+              "*1.* Info Tiket & Harga\n"
+              "*2.* Lokasi & Jam Operasional\n"
+              "*3.* Cara Pemesanan Tiket\n"
+              "*4.* Hubungi Customer Service\n\n"
+              "Atau ketik *PESAN* untuk memesan tiket masuk langsung lewat WhatsApp!",
+        'en': "Hello! Welcome to WhatsApp *{merchant_name}*. How can we help you? 😊\n\n"
+              "Please type the number of your choice:\n"
+              "*1.* Ticket Info & Prices\n"
+              "*2.* Location & Opening Hours\n"
+              "*3.* How to Book Tickets\n"
+              "*4.* Contact Customer Service\n\n"
+              "Or type *BOOKING* to book tickets directly via WhatsApp!"
+    },
+    'cancel': {
+        'id': "❌ Pemesanan tiket dibatalkan. Jika ada hal lain yang bisa kami bantu, silakan hubungi kami kembali.",
+        'en': "❌ Ticket booking cancelled. If there is anything else we can help you with, please contact us again."
+    },
+    'booking_start': {
+        'id': "Halo! Selamat datang di layanan reservasi otomatis *{merchant_name}*.\n\nSilakan ketik *Nama Lengkap* Anda untuk memulai:",
+        'en': "Hello! Welcome to *{merchant_name}* automated reservation service.\n\nPlease type your *Full Name* to start:"
+    },
+    'no_tickets': {
+        'id': "Maaf, saat ini tidak ada tiket aktif yang dapat dipesan. Silakan hubungi customer service kami.",
+        'en': "Sorry, there are no active tickets available for booking at the moment. Please contact our customer service."
+    },
+    'step1_prompt': {
+        'id': "Hai *{name}*!\n\nSilakan pilih kategori tiket masuk (Ketik nomornya):\n\n{options_text}\nKetik *BATAL* jika ingin membatalkan.",
+        'en': "Hi *{name}*!\n\nPlease select ticket category (Type the number):\n\n{options_text}\nType *CANCEL* to cancel."
+    },
+    'step2_invalid': {
+        'id': "Pilihan nomor tidak valid. Silakan pilih nomor *1* sampai *{count}*, atau ketik *BATAL* untuk keluar.",
+        'en': "Invalid number selection. Please select a number from *1* to *{count}*, or type *CANCEL* to exit."
+    },
+    'step2_prompt': {
+        'id': "Anda memilih tiket:\n*{title}* (Rp {price:,})\n\nBerapa jumlah tiket yang ingin Anda pesan?\n(Ketik angka saja, contoh: *2*)",
+        'en': "You selected ticket:\n*{title}* (Rp {price:,})\n\nHow many tickets would you like to book?\n(Type number only, e.g., *2*)"
+    },
+    'step3_invalid': {
+        'id': "Jumlah tiket tidak valid. Silakan ketik angka lebih besar dari 0 (contoh: *3*).",
+        'en': "Invalid number of tickets. Please type a number greater than 0 (e.g., *3*)."
+    },
+    'step3_prompt': {
+        'id': "Silakan pilih metode pembayaran (Ketik nomornya):\n\n{options_text}\nKetik *BATAL* untuk membatalkan.",
+        'en': "Please select payment method (Type the number):\n\n{options_text}\nType *CANCEL* to cancel."
+    },
+    'step4_invalid': {
+        'id': "Pilihan pembayaran tidak valid. Silakan ketik angka *1* sampai *{count}*.",
+        'en': "Invalid payment selection. Please type a number from *1* to *{count}*."
+    },
+    'step4_prompt': {
+        'id': "Berikut ringkasan pesanan Anda:\n\n"
+              "• Nama: *{name}*\n"
+              "• Tiket: *{title}*\n"
+              "• Jumlah: *{quantity} pcs*\n"
+              "• Total Bayar: *Rp {total_bill:,}*\n"
+              "• Pembayaran: *{payment_method}*\n\n"
+              "Apakah data pesanan ini sudah benar?\n"
+              "Ketik *YA* jika setuju, atau *BATAL* jika ingin membatalkan.",
+        'en': "Here is your booking summary:\n\n"
+              "• Name: *{name}*\n"
+              "• Ticket: *{title}*\n"
+              "• Quantity: *{quantity} pcs*\n"
+              "• Total Bill: *Rp {total_bill:,}*\n"
+              "• Payment Method: *{payment_method}*\n\n"
+              "Is this booking information correct?\n"
+              "Type *YES* to confirm, or *CANCEL* to cancel."
+    },
+    'step5_success': {
+        'id': "Pemesanan Berhasil! 🎉\n\n"
+              "• *Invoice ID*: #{invoice_id}\n"
+              "• *Voucher Code*: {voucher_code}\n"
+              "• *Nama*: {name}\n"
+              "• *Tiket*: {title}\n"
+              "• *Jumlah*: {quantity} pcs\n"
+              "• *Total Bayar*: Rp {total_bill:,}\n"
+              "• *Status*: Belum Lunas (Unpaid){payment_instructions}\n\n"
+              "Setelah pembayaran lunas, voucher aktif Anda dapat diakses dan diunduh di website kami: http://{merchant_website}/vouchers.html?code={voucher_code}\n\n"
+              "Terima kasih! Sampai jumpa di Batur Hot Spring.",
+        'en': "Booking Successful! 🎉\n\n"
+              "• *Invoice ID*: #{invoice_id}\n"
+              "• *Voucher Code*: {voucher_code}\n"
+              "• *Name*: {name}\n"
+              "• *Ticket*: {title}\n"
+              "• *Quantity*: {quantity} pcs\n"
+              "• *Total Bill*: Rp {total_bill:,}\n"
+              "• *Status*: Unpaid{payment_instructions}\n\n"
+              "Once payment is completed, your active voucher can be accessed and downloaded on our website: http://{merchant_website}/vouchers.html?code={voucher_code}\n\n"
+              "Thank you! See you at Batur Hot Spring."
+    },
+    'step5_error': {
+        'id': "Maaf, terjadi kesalahan sistem saat membuat pesanan Anda. Silakan coba lagi nanti.",
+        'en': "Sorry, a system error occurred while creating your booking. Please try again later."
+    },
+    'step5_invalid': {
+        'id': "Konfirmasi tidak dikenali. Silakan ketik *YA* untuk konfirmasi pesanan Anda, atau *BATAL* jika ingin membatalkan.",
+        'en': "Confirmation not recognized. Please type *YES* to confirm your booking, or *CANCEL* to cancel."
+    },
+    'ticket_list_header': {
+        'id': "Daftar Harga Tiket Masuk *{merchant_name}*:\n\n",
+        'en': "Ticket Prices for *{merchant_name}*:\n\n"
+    },
+    'ticket_list_empty': {
+        'id': "Saat ini tidak ada kategori tiket aktif.",
+        'en': "There are no active ticket categories at the moment."
+    },
+    'ticket_list_footer': {
+        'id': "Ketik *PESAN* untuk memesan tiket secara langsung.",
+        'en': "Type *BOOKING* to book tickets directly."
+    },
+    'location_info': {
+        'id': "📍 *Alamat & Lokasi {merchant_name}*:\n"
+              "{merchant_address}\n\n"
+              "🕒 *Jam Operasional*:\n"
+              "Setiap hari: 07:00 - 19:00 WITA\n\n"
+              "Website resmi: http://{merchant_website}",
+        'en': "📍 *Address & Location of {merchant_name}*:\n"
+              "{merchant_address}\n\n"
+              "🕒 *Opening Hours*:\n"
+              "Every day: 07:00 - 19:00 WITA\n\n"
+              "Official website: http://{merchant_website}"
+    },
+    'cs_info': {
+        'id': "📞 *Layanan Pelanggan {merchant_name}*:\n\n"
+              "Pesan Anda telah diteruskan ke Customer Service (CS).\n"
+              "Sistem chatbot dijeda sementara. Admin kami akan segera membalas pesan Anda di sini.\n\n"
+              "Hubungi langsung jika darurat:\n"
+              "• Telepon: {merchant_phone}\n"
+              "• Email: {merchant_email}",
+        'en': "📞 *Customer Service for {merchant_name}*:\n\n"
+              "Your message has been forwarded to Customer Service (CS).\n"
+              "The chatbot is temporarily paused. Our admin will reply to your message here shortly.\n\n"
+              "Contact directly for emergencies:\n"
+              "• Phone: {merchant_phone}\n"
+              "• Email: {merchant_email}"
+    },
+    'cara_booking': {
+        'id': "💡 *Cara Pemesanan Tiket*:\n\n"
+              "1. Ketik *PESAN* di chat ini untuk melakukan pemesanan instan.\n"
+              "2. Isi Nama, pilih kategori tiket, jumlah tiket, dan metode pembayaran.\n"
+              "3. Lakukan transfer sesuai instruksi yang diberikan.\n"
+              "4. Konfirmasi pembayaran Anda ke admin melalui chat ini.\n"
+              "5. Setelah lunas, Anda akan mendapatkan voucher dengan kode QR unik.\n\n"
+              "Anda juga bisa memesan tiket langsung di website kami: http://{merchant_website}",
+        'en': "💡 *How to Book Tickets*:\n\n"
+              "1. Type *BOOKING* in this chat to start instant booking.\n"
+              "2. Fill in your Name, select ticket category, quantity, and payment method.\n"
+              "3. Transfer payment according to instructions.\n"
+              "4. Confirm payment to admin via this chat.\n"
+              "5. Once paid, you will receive a voucher with a unique QR code.\n\n"
+              "You can also book tickets directly on our website: http://{merchant_website}"
+    },
+    'cash_instruction': {
+        'id': "\n\nSilakan tunjukkan Invoice ID Anda saat kedatangan di loket kami untuk pembayaran.",
+        'en': "\n\nPlease show your Invoice ID at our counter to pay upon arrival."
+    },
+    'transfer_instruction': {
+        'id': "\n\nSilakan transfer ke *{bank_name}* a/n *{merchant_name}*.",
+        'en': "\n\nPlease transfer to *{bank_name}* a/n *{merchant_name}*."
+    }
+}
+
 # Core Chatbot Responder
 def handle_message(sender, raw_text):
     text = raw_text.lower().strip()
@@ -182,18 +437,69 @@ def handle_message(sender, raw_text):
     
     # Manage session timeout
     clear_expired_sessions()
-    session = SESSIONS.get(sender)
+    session = get_session(sender)
     
-    # Handle global cancellation
-    if text == 'batal' and session:
-        del SESSIONS[sender]
-        reply = "❌ Pemesanan tiket dibatalkan. Jika ada hal lain yang bisa kami bantu, silakan hubungi kami kembali."
+    # Language detection and switching
+    lang = 'id'
+    if session and 'lang' in session:
+        lang = session['lang']
+    else:
+        # Detect from message on first contact
+        en_indicators = ['english', 'en', 'hello', 'hi', 'hey', 'booking', 'ticket', 'price', 'location', 'hours', 'help']
+        if any(w in text for w in en_indicators):
+            lang = 'en'
+            
+    if text in ['english', 'en', 'inggris']:
+        lang = 'en'
+        if not session:
+            session = {"step": 0, "bot_mode": "bot", "ticket_status": "closed", "lang": "en"}
+        else:
+            session['lang'] = 'en'
+        save_session(sender, session)
+        reply = "Language changed to English. How can I help you? 😊"
         send_waha_message(sender, reply)
         log_activity(sender, raw_text, reply)
         return
-
+    elif text in ['indonesia', 'id', 'indo']:
+        lang = 'id'
+        if not session:
+            session = {"step": 0, "bot_mode": "bot", "ticket_status": "closed", "lang": "id"}
+        else:
+            session['lang'] = 'id'
+        save_session(sender, session)
+        reply = "Bahasa diubah ke Bahasa Indonesia. Ada yang bisa saya bantu? 😊"
+        send_waha_message(sender, reply)
+        log_activity(sender, raw_text, reply)
+        return
+        
+    # Switch language if specific booking keywords are used
+    if 'booking' in text:
+        lang = 'en'
+        if session:
+            session['lang'] = 'en'
+            save_session(sender, session)
+    elif 'pesan' in text:
+        lang = 'id'
+        if session:
+            session['lang'] = 'id'
+            save_session(sender, session)
+            
+    # If session is in manual 'agent' mode, do NOT auto-reply. Just log.
+    if session and session.get('bot_mode') == 'agent':
+        log_activity(sender, raw_text, '')
+        return
+ 
+    # Handle global cancellation
+    is_cancel = (text == 'batal' or text == 'cancel')
+    if is_cancel and session and session.get('step', 0) > 0:
+        delete_session(sender)
+        reply = T['cancel'][lang]
+        send_waha_message(sender, reply)
+        log_activity(sender, raw_text, reply)
+        return
+ 
     # Awaiting steps in booking flow
-    if session:
+    if session and session.get('step', 0) > 0:
         session['timestamp'] = time.time()
         
         # Step 1: Awaiting Name
@@ -201,20 +507,21 @@ def handle_message(sender, raw_text):
             session['name'] = raw_text.strip()
             tickets = db_all("SELECT * FROM tickets WHERE is_active = 1")
             if not tickets:
-                del SESSIONS[sender]
-                reply = "Maaf, saat ini tidak ada tiket aktif yang dapat dipesan. Silakan hubungi customer service kami."
+                delete_session(sender)
+                reply = T['no_tickets'][lang]
                 send_waha_message(sender, reply)
                 log_activity(sender, raw_text, reply)
                 return
             
             session['availableTickets'] = tickets
             session['step'] = 2
+            save_session(sender, session)
             
             options_text = ""
             for idx, t in enumerate(tickets):
                 options_text += f"*{idx + 1}.* {t['title']} - Rp {int(t['price']):,}\n"
             
-            reply = f"Hai *{session['name']}*!\n\nSilakan pilih kategori tiket masuk (Ketik nomornya):\n\n{options_text}\nKetik *BATAL* jika ingin membatalkan."
+            reply = T['step1_prompt'][lang].format(name=session['name'], options_text=options_text)
             send_waha_message(sender, reply)
             log_activity(sender, raw_text, reply)
             return
@@ -226,19 +533,23 @@ def handle_message(sender, raw_text):
                 if val < 1 or val > len(session['availableTickets']):
                     raise ValueError()
             except ValueError:
-                reply = f"Pilihan nomor tidak valid. Silakan pilih nomor *1* sampai *{len(session['availableTickets'])}*, atau ketik *BATAL* untuk keluar."
+                reply = T['step2_invalid'][lang].format(count=len(session['availableTickets']))
                 send_waha_message(sender, reply)
                 log_activity(sender, raw_text, reply)
                 return
                 
             session['ticket'] = session['availableTickets'][val - 1]
             session['step'] = 3
+            save_session(sender, session)
             
-            reply = f"Anda memilih tiket:\n*{session['ticket']['title']}* (Rp {int(session['ticket']['price']):,})\n\nBerapa jumlah tiket yang ingin Anda pesan?\n(Ketik angka saja, contoh: *2*)"
+            reply = T['step2_prompt'][lang].format(
+                title=session['ticket']['title'],
+                price=int(session['ticket']['price'])
+            )
             send_waha_message(sender, reply)
             log_activity(sender, raw_text, reply)
             return
-
+ 
         # Step 3: Awaiting Quantity
         elif session['step'] == 3:
             try:
@@ -246,7 +557,7 @@ def handle_message(sender, raw_text):
                 if qty <= 0:
                     raise ValueError()
             except ValueError:
-                reply = "Jumlah tiket tidak valid. Silakan ketik angka lebih besar dari 0 (contoh: *3*)."
+                reply = T['step3_invalid'][lang]
                 send_waha_message(sender, reply)
                 log_activity(sender, raw_text, reply)
                 return
@@ -259,12 +570,13 @@ def handle_message(sender, raw_text):
             if not active_payments:
                 active_payments = [{'name': 'Tunai'}, {'name': 'Transfer Bank'}, {'name': 'QRIS'}]
             session['availablePayments'] = active_payments
+            save_session(sender, session)
             
             options_text = ""
             for idx, pm in enumerate(active_payments):
                 options_text += f"*{idx + 1}.* {pm['name']}\n"
             
-            reply = f"Silakan pilih metode pembayaran (Ketik nomornya):\n\n{options_text}\nKetik *BATAL* untuk membatalkan."
+            reply = T['step3_prompt'][lang].format(options_text=options_text)
             send_waha_message(sender, reply)
             log_activity(sender, raw_text, reply)
             return
@@ -278,7 +590,7 @@ def handle_message(sender, raw_text):
                     raise ValueError()
                 payment_method = available_payments[val - 1]['name']
             except ValueError:
-                reply = f"Pilihan pembayaran tidak valid. Silakan ketik angka *1* sampai *{len(available_payments)}*."
+                reply = T['step4_invalid'][lang].format(count=len(available_payments))
                 send_waha_message(sender, reply)
                 log_activity(sender, raw_text, reply)
                 return
@@ -286,21 +598,22 @@ def handle_message(sender, raw_text):
             session['paymentMethod'] = payment_method
             session['step'] = 5
             total_bill = int(session['ticket']['price']) * session['quantity']
+            save_session(sender, session)
             
-            reply = (f"Berikut ringkasan pesanan Anda:\n\n"
-                     f"• Nama: *{session['name']}*\n"
-                     f"• Tiket: *{session['ticket']['title']}*\n"
-                     f"• Jumlah: *{session['quantity']} pcs*\n"
-                     f"• Total Bayar: *Rp {total_bill:,}*\n"
-                     f"• Pembayaran: *{session['paymentMethod']}*\n\n"
-                     f"Apakah data pesanan ini sudah benar?\n"
-                     f"Ketik *YA* jika setuju, atau *BATAL* jika ingin membatalkan.")
+            reply = T['step4_prompt'][lang].format(
+                name=session['name'],
+                title=session['ticket']['title'],
+                quantity=session['quantity'],
+                total_bill=total_bill,
+                payment_method=session['paymentMethod']
+            )
             send_waha_message(sender, reply)
             log_activity(sender, raw_text, reply)
             return
             
         elif session['step'] == 5:
-            if text == 'ya':
+            is_yes = (text == 'ya' or text == 'yes')
+            if is_yes:
                 import json
                 total_bill = int(session['ticket']['price']) * session['quantity']
                 # Generate unique voucher code mimicking Node.js code
@@ -316,97 +629,119 @@ def handle_message(sender, raw_text):
                     "total_price": total_bill
                 }]
                 items_json = json.dumps(validated_items)
-
+ 
                 try:
                     res = db_run(
                         "INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, items) VALUES (?, ?, ?, ?, ?, ?)",
                         (session['name'], total_bill, session['paymentMethod'], 'Unpaid', voucher_code, items_json)
                     )
                     
-                    # Clear session
-                    del SESSIONS[sender]
+                    # Clear booking session
+                    delete_session(sender)
                     
                     payment_instructions = ""
                     if "BCA" in session['paymentMethod']:
-                        payment_instructions = "\n\nSilakan transfer ke *BCA 123-456-7890* a/n *Batur Hot Spring*."
+                        payment_instructions = T['transfer_instruction'][lang].format(bank_name="BCA 123-456-7890", merchant_name=merchant_name)
                     elif "Mandiri" in session['paymentMethod']:
-                        payment_instructions = "\n\nSilakan transfer ke *Mandiri 987-654-3210* a/n *Batur Hot Spring*."
+                        payment_instructions = T['transfer_instruction'][lang].format(bank_name="Mandiri 987-654-3210", merchant_name=merchant_name)
                     else:
-                        payment_instructions = "\n\nSilakan tunjukkan Invoice ID Anda saat kedatangan di loket kami untuk pembayaran."
+                        payment_instructions = T['cash_instruction'][lang]
                         
-                    reply = (f"Pemesanan Berhasil! 🎉\n\n"
-                             f"• *Invoice ID*: #{res['id']}\n"
-                             f"• *Voucher Code*: {voucher_code}\n"
-                             f"• *Nama*: {session['name']}\n"
-                             f"• *Tiket*: {session['ticket']['title']}\n"
-                             f"• *Jumlah*: {session['quantity']} pcs\n"
-                             f"• *Total Bayar*: Rp {total_bill:,}\n"
-                             f"• *Status*: Belum Lunas (Unpaid){payment_instructions}\n\n"
-                             f"Setelah pembayaran lunas, voucher aktif Anda dapat diakses dan diunduh di website kami: http://{merchant_website}/vouchers.html?code={voucher_code}\n\n"
-                             f"Terima kasih! Sampai jumpa di Batur Hot Spring.")
+                    reply = T['step5_success'][lang].format(
+                        invoice_id=res['id'],
+                        voucher_code=voucher_code,
+                        name=session['name'],
+                        title=session['ticket']['title'],
+                        quantity=session['quantity'],
+                        total_bill=total_bill,
+                        payment_instructions=payment_instructions,
+                        merchant_website=merchant_website
+                    )
                     send_waha_message(sender, reply)
                     log_activity(sender, raw_text, reply)
                 except Exception as e:
                     print(f"Error database insert: {e}")
-                    del SESSIONS[sender]
-                    reply = "Maaf, terjadi kesalahan sistem saat membuat pesanan Anda. Silakan coba lagi nanti."
+                    delete_session(sender)
+                    reply = T['step5_error'][lang]
                     send_waha_message(sender, reply)
                     log_activity(sender, raw_text, reply)
             else:
-                reply = "Konfirmasi tidak dikenali. Silakan ketik *YA* untuk konfirmasi pesanan Anda, atau *BATAL* jika ingin membatalkan."
+                reply = T['step5_invalid'][lang]
                 send_waha_message(sender, reply)
                 log_activity(sender, raw_text, reply)
             return
-
+ 
     # Trigger booking workflow if keywords found
     if 'pesan' in text or 'booking' in text or text == '3':
-        SESSIONS[sender] = {
-            "step": 1,
-            "timestamp": time.time()
+        new_session = get_session(sender) or {
+            "step": 0,
+            "bot_mode": "bot",
+            "ticket_status": "closed",
+            "lang": lang
         }
-        reply = f"Halo! Selamat datang di layanan reservasi otomatis *{merchant_name}*.\n\nSilakan ketik *Nama Lengkap* Anda untuk memulai:"
+        new_session["step"] = 1
+        new_session["timestamp"] = time.time()
+        new_session["lang"] = lang
+        save_session(sender, new_session)
+        reply = T['booking_start'][lang].format(merchant_name=merchant_name)
         send_waha_message(sender, reply)
         log_activity(sender, raw_text, reply)
         return
-
+ 
     # Handle welcome menu number shortcuts
-    if text == '1' or 'tiket' in text or 'harga' in text:
+    if text == '1' or 'tiket' in text or 'harga' in text or 'ticket' in text or 'price' in text:
         tickets = db_all("SELECT * FROM tickets WHERE is_active = 1")
-        ticket_list = f"Daftar Harga Tiket Masuk *{merchant_name}*:\n\n"
+        ticket_list = T['ticket_list_header'][lang].format(merchant_name=merchant_name)
         if not tickets:
-            ticket_list += "Saat ini tidak ada kategori tiket aktif."
+            ticket_list += T['ticket_list_empty'][lang]
         else:
             for idx, t in enumerate(tickets):
                 ticket_list += f"*{idx + 1}. {t['title']}*\n"
-                ticket_list += f"   Harga: Rp {int(t['price']):,}\n"
+                ticket_list += f"   Price: Rp {int(t['price']):,}\n" if lang == 'en' else f"   Harga: Rp {int(t['price']):,}\n"
                 if t['description']:
                     ticket_list += f"   Detail: {t['description']}\n"
                 ticket_list += "\n"
-            ticket_list += "Ketik *PESAN* untuk memesan tiket secara langsung."
+            ticket_list += T['ticket_list_footer'][lang]
         send_waha_message(sender, ticket_list)
         log_activity(sender, raw_text, ticket_list)
         return
-
-    if text == '2' or 'lokasi' in text or 'alamat' in text or 'jam' in text or 'buka' in text:
-        reply = (f"📍 *Alamat & Lokasi {merchant_name}*:\n"
-                 f"{merchant_address}\n\n"
-                 f"🕒 *Jam Operasional*:\n"
-                 f"Setiap hari: 07:00 - 19:00 WITA\n\n"
-                 f"Website resmi: http://{merchant_website}")
+ 
+    if text == '2' or 'lokasi' in text or 'alamat' in text or 'jam' in text or 'buka' in text or 'location' in text or 'address' in text or 'hours' in text or 'open' in text:
+        reply = T['location_info'][lang].format(
+            merchant_name=merchant_name,
+            merchant_address=merchant_address,
+            merchant_website=merchant_website
+        )
         send_waha_message(sender, reply)
         log_activity(sender, raw_text, reply)
         return
-
-    if text == '4' or 'admin' in text or 'cs' in text or 'hubungi' in text or 'kontak' in text:
-        reply = (f"📞 *Layanan Pelanggan {merchant_name}*:\n\n"
-                 f"Jika Anda memiliki pertanyaan khusus, silakan hubungi kami di:\n"
-                 f"• Telepon: {merchant_phone}\n"
-                 f"• Email: {merchant_email}\n\n"
-                 f"Pesan Anda akan dibalas oleh admin kami segera. Terima kasih!")
+ 
+    if text == '4' or 'admin' in text or 'cs' in text or 'hubungi' in text or 'kontak' in text or 'contact' in text or 'help' in text or 'support' in text:
+        # Switch to agent mode and open support ticket
+        sess = get_session(sender)
+        if not sess:
+            sess = {
+                "step": 0,
+                "bot_mode": "agent",
+                "ticket_status": "open",
+                "ticket_subject": "Customer requested CS support",
+                "lang": lang
+            }
+        else:
+            sess["bot_mode"] = "agent"
+            sess["ticket_status"] = "open"
+            sess["ticket_subject"] = "Customer requested CS support"
+        save_session(sender, sess)
+ 
+        reply = T['cs_info'][lang].format(
+            merchant_name=merchant_name,
+            merchant_phone=merchant_phone,
+            merchant_email=merchant_email
+        )
         send_waha_message(sender, reply)
         log_activity(sender, raw_text, reply)
         return
-
+ 
     # RAG with NVIDIA Nemotron NIM API
     nvidia_key = settings.get('nvidia_api_key', '')
     nvidia_model = settings.get('nvidia_model', 'nvidia/llama-3.1-nemotron-70b-instruct')
@@ -423,23 +758,42 @@ def handle_message(sender, raw_text):
                 ticket_context += f"- {t['title']}: Rp {int(t['price']):,} ({t['description'] or ''})\n"
             
             # 3. Build Prompt with context
-            system_instruction = (
-                f"Kamu adalah Virtual Assistant WhatsApp resmi untuk {merchant_name} ({merchant_website}).\n"
-                f"Tugasmu adalah membantu pelanggan menjawab pertanyaan dengan sopan dan ramah dalam bahasa yang mereka gunakan (Indonesia, Inggris, Bali, dll.).\n\n"
-                f"Gunakan informasi/konteks resmi dari perusahaan berikut untuk menjawab pertanyaan:\n"
-                f"[KONTEKS PERUSAHAAN]\n"
-                f"{context if context else 'Tidak ada konteks spesifik.'}\n"
-                f"[/KONTEKS PERUSAHAAN]\n\n"
-                f"Daftar Tiket Aktif & Harga:\n{ticket_context}\n"
-                f"Ketentuan Pemesanan:\n"
-                f"- Pelanggan bisa memesan tiket langsung lewat WhatsApp dengan mengetik kata kunci \"PESAN\" atau \"BOOKING\".\n"
-                f"- Jika pelanggan ingin memesan tiket, arahkan mereka untuk mengetik \"PESAN\" agar sistem otomatis memandu langkah pemesanan. Jangan lakukan pemesanan manual lewat percakapan AI biasa.\n\n"
-                f"Aturan Jawaban:\n"
-                f"- Jawab dengan singkat, padat, dan ramah.\n"
-                f"- Gunakan emoji yang sesuai.\n"
-                f"- Hanya jawab berdasarkan konteks perusahaan yang disediakan. Jika tidak tahu atau tidak ada di konteks, jawab bahwa Anda tidak tahu dan arahkan untuk menghubungi CS di {merchant_phone}.\n"
-                f"- Jawab menggunakan bahasa yang sama dengan pesan pelanggan."
-            )
+            if lang == 'en':
+                system_instruction = (
+                    f"You are the official WhatsApp Virtual Assistant for {merchant_name} ({merchant_website}).\n"
+                    f"Your job is to assist customers by answering their questions politely and friendly in the language they use (Indonesian, English, Balinese, etc.).\n\n"
+                    f"Use the following official company information/context to answer questions:\n"
+                    f"[COMPANY CONTEXT]\n"
+                    f"{context if context else 'No specific context.'}\n"
+                    f"[/COMPANY CONTEXT]\n\n"
+                    f"Active Tickets & Prices:\n{ticket_context}\n"
+                    f"Booking Terms:\n"
+                    f"- Customers can book tickets directly through WhatsApp by typing \"BOOKING\" or \"PESAN\".\n"
+                    f"- If customers want to book tickets, instruct them to type \"BOOKING\" to start the automated booking. Do not book manually via AI chat.\n\n"
+                    f"Answer Rules:\n"
+                    f"- Keep answers short, clear, and friendly.\n"
+                    f"- Use appropriate emojis.\n"
+                    f"- Only answer based on the provided company context. If you do not know or it is not in the context, say that you do not know and refer them to CS at {merchant_phone}.\n"
+                    f"- Reply using the exact same language as the customer's message."
+                )
+            else:
+                system_instruction = (
+                    f"Kamu adalah Virtual Assistant WhatsApp resmi untuk {merchant_name} ({merchant_website}).\n"
+                    f"Tugasmu adalah membantu pelanggan menjawab pertanyaan dengan sopan dan ramah dalam bahasa yang mereka gunakan (Indonesia, Inggris, Bali, dll.).\n\n"
+                    f"Gunakan informasi/konteks resmi dari perusahaan berikut untuk menjawab pertanyaan:\n"
+                    f"[KONTEKS PERUSAHAAN]\n"
+                    f"{context if context else 'Tidak ada konteks spesifik.'}\n"
+                    f"[/KONTEKS PERUSAHAAN]\n\n"
+                    f"Daftar Tiket Aktif & Harga:\n{ticket_context}\n"
+                    f"Ketentuan Pemesanan:\n"
+                    f"- Pelanggan bisa memesan tiket langsung lewat WhatsApp dengan mengetik kata kunci \"PESAN\" atau \"BOOKING\".\n"
+                    f"- Jika pelanggan ingin memesan tiket, arahkan mereka untuk mengetik \"PESAN\" agar sistem otomatis memandu langkah pemesanan. Jangan lakukan pemesanan manual lewat percakapan AI biasa.\n\n"
+                    f"Aturan Jawaban:\n"
+                    f"- Jawab dengan singkat, padat, dan ramah.\n"
+                    f"- Gunakan emoji yang sesuai.\n"
+                    f"- Hanya jawab berdasarkan konteks perusahaan yang disediakan. Jika tidak tahu atau tidak ada di konteks, jawab bahwa Anda tidak tahu dan arahkan untuk menghubungi CS di {merchant_phone}.\n"
+                    f"- Jawab menggunakan bahasa yang sama dengan pesan pelanggan."
+                )
             
             headers = {
                 "Content-Type": "application/json",
@@ -465,28 +819,16 @@ def handle_message(sender, raw_text):
                 print(f"NVIDIA API Error status {res.status_code}: {res.text}")
         except Exception as api_err:
             print(f"Failed to fetch response from NVIDIA Nemotron: {api_err}")
-
-    # Fallback: Rule-based matching for 'cara'
-    if 'cara' in text:
-        reply = (f"💡 *Cara Pemesanan Tiket*:\n\n"
-                 f"1. Ketik *PESAN* di chat ini untuk melakukan pemesanan instan.\n"
-                 f"2. Isi Nama, pilih kategori tiket, jumlah tiket, dan metode pembayaran.\n"
-                 f"3. Lakukan transfer sesuai instruksi yang diberikan.\n"
-                 f"4. Konfirmasi pembayaran Anda ke admin melalui chat ini.\n"
-                 f"5. Setelah lunas, Anda akan mendapatkan voucher dengan kode QR unik.\n\n"
-                 f"Anda juga bisa memesan tiket langsung di website kami: http://{merchant_website}")
+ 
+    # Fallback: Rule-based matching for 'cara' or 'how'
+    if 'cara' in text or 'how' in text:
+        reply = T['cara_booking'][lang].format(merchant_website=merchant_website)
         send_waha_message(sender, reply)
         log_activity(sender, raw_text, reply)
         return
-
+ 
     # Welcome Fallback Message
-    welcome = (f"Halo! Selamat datang di WhatsApp *{merchant_name}*. ada yang bisa kami bantu? 😊\n\n"
-               f"Silakan ketik nomor pilihan berikut:\n"
-               f"*1.* Info Tiket & Harga\n"
-               f"*2.* Lokasi & Jam Operasional\n"
-               f"*3.* Cara Pemesanan Tiket\n"
-               f"*4.* Hubungi Customer Service\n\n"
-               f"Atau ketik *PESAN* untuk memesan tiket masuk langsung lewat WhatsApp!")
+    welcome = T['welcome'][lang].format(merchant_name=merchant_name)
     send_waha_message(sender, welcome)
     log_activity(sender, raw_text, welcome)
 
@@ -547,10 +889,15 @@ def status():
         except Exception as e:
             print(f"Failed to fetch QR image: {e}")
         
+    try:
+        sessions_count = db_get("SELECT COUNT(*) as count FROM chatbot_sessions WHERE step > 0")['count']
+    except Exception:
+        sessions_count = 0
+        
     return jsonify({
         "status": status_str,
         "qr": qr_data_url,
-        "sessionsCount": len(SESSIONS)
+        "sessionsCount": sessions_count
     })
 
 # Start session API Endpoint

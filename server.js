@@ -197,6 +197,22 @@ async function initializeDatabase() {
       await dbRun('INSERT INTO payment_methods (name, is_active) VALUES (?, 1)', ['Debit Card']);
       console.log('Seeded initial payment methods.');
     }
+
+    // Create Chatbot Sessions Table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS chatbot_sessions (
+        phone TEXT PRIMARY KEY,
+        step INTEGER DEFAULT 0,
+        timestamp REAL,
+        name TEXT,
+        ticket_id INTEGER,
+        quantity INTEGER,
+        payment_method TEXT,
+        bot_mode TEXT DEFAULT 'bot',
+        ticket_status TEXT DEFAULT 'closed',
+        ticket_subject TEXT
+      )
+    `);
   } catch (error) {
     console.error('Database initialization error:', error);
   }
@@ -614,6 +630,126 @@ app.delete('/api/payment-methods/:id', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Helpdesk API routes
+app.get('/api/helpdesk/chats', authenticateToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        wl.phone,
+        COALESCE(cs.name, '') as name,
+        COALESCE(cs.bot_mode, 'bot') as bot_mode,
+        COALESCE(cs.ticket_status, 'closed') as ticket_status,
+        COALESCE(cs.ticket_subject, '') as ticket_subject,
+        MAX(wl.timestamp) as last_activity,
+        (SELECT message FROM whatsapp_logs WHERE phone = wl.phone ORDER BY id DESC LIMIT 1) as last_message,
+        (SELECT reply FROM whatsapp_logs WHERE phone = wl.phone ORDER BY id DESC LIMIT 1) as last_reply
+      FROM whatsapp_logs wl
+      LEFT JOIN chatbot_sessions cs ON wl.phone = cs.phone
+      GROUP BY wl.phone
+      ORDER BY last_activity DESC
+    `;
+    const rows = await dbAll(query);
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/helpdesk/chats/:phone', authenticateToken, async (req, res) => {
+  const { phone } = req.params;
+  try {
+    const logs = await dbAll('SELECT * FROM whatsapp_logs WHERE phone = ? ORDER BY id ASC', [phone]);
+    const session = await dbGet('SELECT * FROM chatbot_sessions WHERE phone = ?', [phone]);
+    res.json({
+      logs: logs.map(l => ({
+        id: l.id,
+        phone: l.phone,
+        message: l.message,
+        reply: l.reply,
+        timestamp: l.timestamp
+      })),
+      session: session || { phone, bot_mode: 'bot', ticket_status: 'closed', step: 0 }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/helpdesk/sessions/:phone/toggle-bot', authenticateToken, async (req, res) => {
+  const { phone } = req.params;
+  const { bot_mode } = req.body;
+  try {
+    const existing = await dbGet('SELECT phone FROM chatbot_sessions WHERE phone = ?', [phone]);
+    if (existing) {
+      await dbRun('UPDATE chatbot_sessions SET bot_mode = ? WHERE phone = ?', [bot_mode, phone]);
+    } else {
+      await dbRun('INSERT INTO chatbot_sessions (phone, bot_mode, ticket_status) VALUES (?, ?, ?)', [phone, bot_mode, 'closed']);
+    }
+    res.json({ success: true, phone, bot_mode });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/helpdesk/sessions/:phone/toggle-ticket', authenticateToken, async (req, res) => {
+  const { phone } = req.params;
+  const { ticket_status } = req.body;
+  try {
+    const existing = await dbGet('SELECT phone FROM chatbot_sessions WHERE phone = ?', [phone]);
+    if (existing) {
+      await dbRun('UPDATE chatbot_sessions SET ticket_status = ? WHERE phone = ?', [ticket_status, phone]);
+    } else {
+      await dbRun('INSERT INTO chatbot_sessions (phone, bot_mode, ticket_status) VALUES (?, ?, ?)', [phone, 'bot', ticket_status]);
+    }
+    res.json({ success: true, phone, ticket_status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/helpdesk/sessions/:phone/message', authenticateToken, async (req, res) => {
+  const { phone } = req.params;
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Message text is required' });
+  }
+  try {
+    const wahaRow = await dbGet("SELECT value FROM settings WHERE key = 'waha_url'");
+    const wahaUrl = (wahaRow && wahaRow.value) || 'http://localhost:3006';
+    const chat_id = phone.includes('@') ? phone : `${phone}@c.us`;
+    const wahaPayload = {
+      session: "default",
+      chatId: chat_id,
+      text: text
+    };
+    
+    console.log(`Sending manual helpdesk message via WAHA: ${wahaUrl}/api/sendText`, wahaPayload);
+    const wahaRes = await fetch(`${wahaUrl}/api/sendText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(wahaPayload)
+    });
+    
+    if (!wahaRes.ok) {
+      const errText = await wahaRes.text();
+      throw new Error(`WAHA API returned status ${wahaRes.status}: ${errText}`);
+    }
+    
+    const existing = await dbGet('SELECT phone FROM chatbot_sessions WHERE phone = ?', [phone]);
+    if (existing) {
+      await dbRun("UPDATE chatbot_sessions SET bot_mode = 'agent' WHERE phone = ?", [phone]);
+    } else {
+      await dbRun("INSERT INTO chatbot_sessions (phone, bot_mode, ticket_status) VALUES (?, 'agent', 'open')", [phone]);
+    }
+    
+    await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, '', ?)", [phone, text]);
+    res.json({ success: true, phone, reply: text });
+  } catch (error) {
+    console.error('Error sending manual helpdesk message:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
