@@ -664,7 +664,6 @@
             <div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-xl shadow-sm">
               <h3 class="font-headline-sm text-headline-sm font-semibold mb-4 text-primary" id="store-form-title">Buat Kategori Tiket</h3>
               <form id="store-ticket-form" class="space-y-4">
-                <input type="hidden" id="store-ticket-edit-id">
                 <div class="flex flex-col gap-1.5">
                   <label for="store-ticket-title" class="text-xs font-bold uppercase text-on-surface-variant">Nama Kategori</label>
                   <input type="text" id="store-ticket-title" placeholder="e.g. Regular (Domestic)" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
@@ -690,7 +689,6 @@
                 </div>
                 <div class="flex gap-2">
                   <button type="submit" id="btn-store-save-ticket" class="flex-grow bg-primary text-on-primary py-2 px-4 rounded-lg font-bold hover:bg-surface-tint">Simpan Kategori</button>
-                  <button type="button" id="btn-store-cancel-edit" onclick="resetStoreTicketForm()" class="hidden bg-surface-container-high text-on-surface px-4 py-2 rounded-lg hover:bg-surface-dim">Batal</button>
                 </div>
               </form>
             </div>
@@ -1560,6 +1558,47 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- EDIT TICKET MODAL -->
+  <div id="edit-ticket-modal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+    <div class="modal-overlay absolute inset-0 bg-on-background/40 backdrop-blur-sm" onclick="closeEditTicketModal()"></div>
+    <div class="modal-content relative z-10 w-full max-w-md p-6 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg no-print">
+      <button class="modal-close-btn absolute top-4 right-4" onclick="closeEditTicketModal()">✕</button>
+      
+      <h3 class="font-headline-sm text-headline-sm font-semibold mb-4 text-primary">Edit Kategori Tiket</h3>
+      
+      <form id="edit-ticket-form" class="space-y-4">
+        <input type="hidden" id="edit-ticket-id">
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-ticket-title" class="text-xs font-bold uppercase text-on-surface-variant">Nama Kategori</label>
+          <input type="text" id="edit-ticket-title" placeholder="e.g. Regular (Domestic)" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-ticket-price" class="text-xs font-bold uppercase text-on-surface-variant">Harga (Rp)</label>
+          <input type="number" id="edit-ticket-price" placeholder="e.g. 70000" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-ticket-discount" class="text-xs font-bold uppercase text-on-surface-variant">Diskon per Item (Rp)</label>
+          <input type="number" id="edit-ticket-discount" placeholder="e.g. 10000" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-ticket-desc" class="text-xs font-bold uppercase text-on-surface-variant">Deskripsi</label>
+          <textarea id="edit-ticket-desc" rows="3" placeholder="Detail deskripsi tiket..." class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary"></textarea>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-ticket-status" class="text-xs font-bold uppercase text-on-surface-variant">Status</label>
+          <select id="edit-ticket-status" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+            <option value="1">Aktif</option>
+            <option value="0">Tidak Aktif</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-grow bg-primary text-on-primary py-2 px-4 rounded-lg font-bold hover:bg-surface-tint">Simpan Perubahan</button>
+          <button type="button" onclick="closeEditTicketModal()" class="bg-surface-container-high text-on-surface px-4 py-2 rounded-lg hover:bg-surface-dim">Batal</button>
+        </div>
+      </form>
     </div>
   </div>
 

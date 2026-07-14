@@ -192,19 +192,15 @@ function setupEventListeners() {
   // Ticket CRUD form submit (Configure Ticket Class in Store panel)
   document.getElementById('store-ticket-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const id = document.getElementById('store-ticket-edit-id').value;
     const title = document.getElementById('store-ticket-title').value;
     const price = parseFloat(document.getElementById('store-ticket-price').value);
     const discount = parseFloat(document.getElementById('store-ticket-discount')?.value) || 0;
     const description = document.getElementById('store-ticket-desc').value;
     const is_active = parseInt(document.getElementById('store-ticket-status').value);
 
-    const url = id ? `/api/tickets/${id}` : '/api/tickets';
-    const method = id ? 'PUT' : 'POST';
-
     try {
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('/api/tickets', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': token
@@ -215,8 +211,41 @@ function setupEventListeners() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to save ticket class');
 
-      showToast(id ? 'Ticket class updated!' : 'New ticket class created!');
+      showToast('New ticket class created!');
       resetStoreTicketForm();
+      await loadTickets();
+      renderStoreTicketsTable();
+      renderBookingCatalog();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  // Edit Ticket form submit
+  document.getElementById('edit-ticket-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-ticket-id').value;
+    const title = document.getElementById('edit-ticket-title').value;
+    const price = parseFloat(document.getElementById('edit-ticket-price').value);
+    const discount = parseFloat(document.getElementById('edit-ticket-discount')?.value) || 0;
+    const description = document.getElementById('edit-ticket-desc').value;
+    const is_active = parseInt(document.getElementById('edit-ticket-status').value);
+
+    try {
+      const response = await fetch(`/api/tickets/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify({ title, price, discount, description, is_active })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update ticket class');
+
+      showToast('Ticket class updated!');
+      closeEditTicketModal();
       await loadTickets();
       renderStoreTicketsTable();
       renderBookingCatalog();
@@ -878,32 +907,31 @@ function renderStoreTicketsTable() {
 
 // Edit ticket in Store panel
 function editStoreTicket(id, title, price, discount, description, is_active) {
-  document.getElementById('store-ticket-edit-id').value = id;
-  document.getElementById('store-ticket-title').value = title;
-  document.getElementById('store-ticket-price').value = price;
-  const discEl = document.getElementById('store-ticket-discount');
+  document.getElementById('edit-ticket-id').value = id;
+  document.getElementById('edit-ticket-title').value = title;
+  document.getElementById('edit-ticket-price').value = price;
+  const discEl = document.getElementById('edit-ticket-discount');
   if (discEl) discEl.value = discount || 0;
-  document.getElementById('store-ticket-desc').value = description;
-  document.getElementById('store-ticket-status').value = is_active;
+  document.getElementById('edit-ticket-desc').value = description;
+  document.getElementById('edit-ticket-status').value = is_active;
+  
+  const modal = document.getElementById('edit-ticket-modal');
+  if (modal) modal.classList.remove('hidden');
+}
 
-  document.getElementById('store-form-title').innerText = 'Edit Ticket Category';
-  document.getElementById('btn-store-save-ticket').innerText = 'Update Ticket Class';
-  document.getElementById('btn-store-cancel-edit').classList.remove('hidden');
+function closeEditTicketModal() {
+  const modal = document.getElementById('edit-ticket-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 // Reset ticket class CRUD form
 function resetStoreTicketForm() {
-  document.getElementById('store-ticket-edit-id').value = '';
   document.getElementById('store-ticket-title').value = '';
   document.getElementById('store-ticket-price').value = '';
   const discEl = document.getElementById('store-ticket-discount');
   if (discEl) discEl.value = '0';
   document.getElementById('store-ticket-desc').value = '';
   document.getElementById('store-ticket-status').value = '1';
-
-  document.getElementById('store-form-title').innerText = 'Create Ticket Category';
-  document.getElementById('btn-store-save-ticket').innerText = 'Save Category';
-  document.getElementById('btn-store-cancel-edit').classList.add('hidden');
 }
 
 // Delete ticket from Store catalog
