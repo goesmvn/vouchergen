@@ -71,6 +71,14 @@ async function initializeDatabase() {
       // Column already exists, ignore
     }
 
+    // Safe migration: Add discount column if it doesn't exist
+    try {
+      await dbRun('ALTER TABLE tickets ADD COLUMN discount REAL DEFAULT 0');
+      console.log('Added discount column to tickets.');
+    } catch (e) {
+      // Column already exists, ignore
+    }
+
     // Recreate invoices table if it does not have 'items' column (for migration)
     let dropInvoices = false;
     try {
@@ -257,28 +265,28 @@ app.get('/api/tickets', async (req, res) => {
 });
 
 app.post('/api/tickets', authenticateToken, async (req, res) => {
-  const { title, price, description, is_active } = req.body;
+  const { title, price, description, is_active, discount } = req.body;
   if (!title || !price) {
     return res.status(400).json({ error: 'Title and Price are required' });
   }
   try {
     const result = await dbRun(
-      'INSERT INTO tickets (title, price, description, is_active) VALUES (?, ?, ?, ?)',
-      [title, parseFloat(price), description, is_active !== undefined ? is_active : 1]
+      'INSERT INTO tickets (title, price, description, is_active, discount) VALUES (?, ?, ?, ?, ?)',
+      [title, parseFloat(price), description, is_active !== undefined ? is_active : 1, parseFloat(discount) || 0]
     );
-    res.status(201).json({ id: result.id, title, price, description, is_active: is_active !== undefined ? is_active : 1 });
+    res.status(201).json({ id: result.id, title, price, description, is_active: is_active !== undefined ? is_active : 1, discount: parseFloat(discount) || 0 });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 app.put('/api/tickets/:id', authenticateToken, async (req, res) => {
-  const { title, price, description, is_active } = req.body;
+  const { title, price, description, is_active, discount } = req.body;
   const { id } = req.params;
   try {
     await dbRun(
-      'UPDATE tickets SET title = ?, price = ?, description = ?, is_active = ? WHERE id = ?',
-      [title, parseFloat(price), description, is_active !== undefined ? is_active : 1, id]
+      'UPDATE tickets SET title = ?, price = ?, description = ?, is_active = ?, discount = ? WHERE id = ?',
+      [title, parseFloat(price), description, is_active !== undefined ? is_active : 1, parseFloat(discount) || 0, id]
     );
     res.json({ message: 'Ticket updated successfully' });
   } catch (error) {
@@ -345,12 +353,13 @@ app.post('/api/invoices', async (req, res) => {
       if (!ticket) {
         return res.status(404).json({ error: `Ticket type ${item.ticketId} not found` });
       }
-      const itemTotalPrice = ticket.price * item.quantity;
+      const itemTotalPrice = (ticket.price - (ticket.discount || 0)) * item.quantity;
       totalPrice += itemTotalPrice;
       validatedItems.push({
         ticket_id: ticket.id,
         ticket_title: ticket.title,
         ticket_price: ticket.price,
+        ticket_discount: ticket.discount || 0,
         quantity: item.quantity,
         total_price: itemTotalPrice
       });

@@ -195,6 +195,7 @@ function setupEventListeners() {
     const id = document.getElementById('store-ticket-edit-id').value;
     const title = document.getElementById('store-ticket-title').value;
     const price = parseFloat(document.getElementById('store-ticket-price').value);
+    const discount = parseFloat(document.getElementById('store-ticket-discount')?.value) || 0;
     const description = document.getElementById('store-ticket-desc').value;
     const is_active = parseInt(document.getElementById('store-ticket-status').value);
 
@@ -208,7 +209,7 @@ function setupEventListeners() {
           'Content-Type': 'application/json',
           'Authorization': token
         },
-        body: JSON.stringify({ title, price, description, is_active })
+        body: JSON.stringify({ title, price, discount, description, is_active })
       });
 
       const data = await response.json();
@@ -859,14 +860,15 @@ function renderStoreTicketsTable() {
     const isAct = ticket.is_active === 1;
     const statusText = isAct ? 'Active' : 'Inactive';
     const statusClass = isAct ? 'badge-paid' : 'badge-unpaid';
+    const discText = ticket.discount > 0 ? `<br><span class="text-[10px] text-emerald-600 font-semibold">Diskon: Rp ${ticket.discount.toLocaleString('id-ID')}</span>` : '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${ticket.title}</strong></td>
-      <td>Rp ${ticket.price.toLocaleString('id-ID')}</td>
+      <td>Rp ${ticket.price.toLocaleString('id-ID')}${discText}</td>
       <td><span class="badge ${statusClass}">${statusText}</span></td>
       <td class="button-row">
-        <button class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-lg text-xs font-semibold hover:bg-opacity-80 transition-all mr-2" onclick="editStoreTicket(${ticket.id}, '${ticket.title.replace(/'/g, "\\'")}', ${ticket.price}, '${(ticket.description || '').replace(/'/g, "\\'")}', ${ticket.is_active})">Edit</button>
+        <button class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-lg text-xs font-semibold hover:bg-opacity-80 transition-all mr-2" onclick="editStoreTicket(${ticket.id}, '${ticket.title.replace(/'/g, "\\'")}', ${ticket.price}, ${ticket.discount || 0}, '${(ticket.description || '').replace(/'/g, "\\'")}', ${ticket.is_active})">Edit</button>
         <button class="px-3 py-1 bg-error-container text-on-error-container rounded-lg text-xs font-semibold hover:bg-opacity-80 transition-all" onclick="deleteStoreTicket(${ticket.id})">Delete</button>
       </td>
     `;
@@ -875,10 +877,12 @@ function renderStoreTicketsTable() {
 }
 
 // Edit ticket in Store panel
-function editStoreTicket(id, title, price, description, is_active) {
+function editStoreTicket(id, title, price, discount, description, is_active) {
   document.getElementById('store-ticket-edit-id').value = id;
   document.getElementById('store-ticket-title').value = title;
   document.getElementById('store-ticket-price').value = price;
+  const discEl = document.getElementById('store-ticket-discount');
+  if (discEl) discEl.value = discount || 0;
   document.getElementById('store-ticket-desc').value = description;
   document.getElementById('store-ticket-status').value = is_active;
 
@@ -892,6 +896,8 @@ function resetStoreTicketForm() {
   document.getElementById('store-ticket-edit-id').value = '';
   document.getElementById('store-ticket-title').value = '';
   document.getElementById('store-ticket-price').value = '';
+  const discEl = document.getElementById('store-ticket-discount');
+  if (discEl) discEl.value = '0';
   document.getElementById('store-ticket-desc').value = '';
   document.getElementById('store-ticket-status').value = '1';
 
@@ -1014,13 +1020,18 @@ function renderBookingCatalog() {
       categoryName = parts[1].replace(')', '').trim();
     }
 
+    let priceDisplay = `Rp ${ticket.price.toLocaleString('id-ID')}`;
+    if (ticket.discount > 0) {
+      priceDisplay = `<del class="text-xs text-on-surface-variant font-normal mr-2">Rp ${ticket.price.toLocaleString('id-ID')}</del> Rp ${(ticket.price - ticket.discount).toLocaleString('id-ID')}`;
+    }
+
     const itemDiv = document.createElement('div');
     itemDiv.className = 'flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl shadow-sm transition-all hover:shadow-md';
     itemDiv.innerHTML = `
       <div class="flex flex-col gap-1">
         <span class="font-semibold text-on-surface text-sm">${mainHeaderName}</span>
         <span class="text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full w-fit">${categoryName}</span>
-        <span class="font-bold text-primary text-sm mt-1">Rp ${ticket.price.toLocaleString('id-ID')}</span>
+        <span class="font-bold text-primary text-sm mt-1">${priceDisplay}</span>
       </div>
       <div class="flex items-center gap-2 bg-surface-container-high rounded-lg p-1.5 border border-outline-variant">
         <button type="button" onclick="updateQty(${ticket.id}, -1)" class="w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-on-surface hover:bg-primary hover:text-on-primary active:scale-90 transition-all font-bold text-lg select-none">−</button>
@@ -1071,7 +1082,7 @@ function updateBookingTotal() {
   ticketCatalog.forEach(ticket => {
     const qty = bookingQuantities[ticket.id] || 0;
     if (qty > 0) {
-      subtotal += ticket.price * qty;
+      subtotal += (ticket.price - (ticket.discount || 0)) * qty;
       selectedItems.push({ ticket, qty });
     }
   });
@@ -1106,9 +1117,9 @@ function updateBookingTotal() {
         <div class="flex justify-between items-center py-1.5 border-b border-outline-variant last:border-0">
           <div>
             <div class="text-xs font-semibold text-on-surface">${ticket.title}</div>
-            <div class="text-[10px] text-on-surface-variant">${qty} × Rp ${ticket.price.toLocaleString('id-ID')}</div>
+            <div class="text-[10px] text-on-surface-variant">${qty} × Rp ${(ticket.price - (ticket.discount || 0)).toLocaleString('id-ID')}</div>
           </div>
-          <span class="text-xs font-bold text-on-surface">Rp ${(ticket.price * qty).toLocaleString('id-ID')}</span>
+          <span class="text-xs font-bold text-on-surface">Rp ${((ticket.price - (ticket.discount || 0)) * qty).toLocaleString('id-ID')}</span>
         </div>
       `).join('');
     }
@@ -1295,7 +1306,7 @@ function showBookingConfirm() {
   let subtotal = 0;
   ticketCatalog.forEach(ticket => {
     const qty = bookingQuantities[ticket.id] || 0;
-    if (qty > 0) { selectedItems.push({ ticket, qty }); subtotal += ticket.price * qty; }
+    if (qty > 0) { selectedItems.push({ ticket, qty }); subtotal += (ticket.price - (ticket.discount || 0)) * qty; }
   });
   if (selectedItems.length === 0) { showToast('Please select at least 1 ticket!', true); return; }
 
@@ -1318,7 +1329,7 @@ function showBookingConfirm() {
   const itemRows = selectedItems.map(({ ticket, qty }) =>
     `<div class="flex justify-between text-xs py-1 border-b border-outline-variant last:border-0">
       <span class="font-semibold text-on-surface">${ticket.title} <span class="text-on-surface-variant font-normal">×${qty}</span></span>
-      <span class="font-bold">Rp ${(ticket.price * qty).toLocaleString('id-ID')}</span>
+      <span class="font-bold">Rp ${((ticket.price - (ticket.discount || 0)) * qty).toLocaleString('id-ID')}</span>
     </div>`
   ).join('');
 
