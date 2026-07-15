@@ -199,6 +199,14 @@ async function initializeDatabase() {
       )
     `);
 
+    // Safe migration: Add instructions column to payment_methods if it doesn't exist
+    try {
+      await dbRun('ALTER TABLE payment_methods ADD COLUMN instructions TEXT DEFAULT \'\'');
+      console.log('Added instructions column to payment_methods.');
+    } catch (e) {
+      // Column already exists, ignore
+    }
+
     // Seed default payment methods if empty
     const pms = await dbAll('SELECT * FROM payment_methods');
     if (pms.length === 0) {
@@ -236,6 +244,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Simple Auth Middleware
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization'];
+  // Allow dinamic tokens OR fallback static token for persistent sessions over container redeploys
   if (token === 'admin-secret-token') {
     next();
   } else {
