@@ -344,7 +344,7 @@ app.get('/api/invoices', async (req, res) => {
   }
 });
 
-app.post('/api/invoices', async (req, res) => {
+app.post('/api/invoices', authenticateToken, async (req, res) => {
   const { customerName, items, paymentMethod, visitDate } = req.body;
   if (!customerName || !items || !items.length || !paymentMethod) {
     return res.status(400).json({ error: 'All fields are required' });

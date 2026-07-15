@@ -1459,7 +1459,10 @@ async function processBookingSubmit(payDirectly = false) {
 
     const response = await fetch('/api/invoices', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': token
+      },
       body: JSON.stringify({
         customerName,
         items: orderItems,
