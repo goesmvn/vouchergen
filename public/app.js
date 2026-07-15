@@ -654,7 +654,7 @@ function renderDashboardStats() {
 
     const items = inv.items || [];
     const firstItem = items[0] || { ticket_title: '-' };
-    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -703,7 +703,7 @@ function renderOrdersTable() {
 
     const items = inv.items || [];
     const firstItem = items[0] || { ticket_title: '-' };
-    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
 
     const tr = document.createElement('tr');
@@ -741,7 +741,7 @@ function renderInvoicesTable() {
 
     const items = inv.items || [];
     const firstItem = items[0] || { ticket_title: '-' };
-    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
 
     const tr = document.createElement('tr');
@@ -782,7 +782,7 @@ function renderVouchersList() {
 
     const items = inv.items || [];
     const firstItem = items[0] || { ticket_title: '-' };
-    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} lainnya` : firstItem.ticket_title;
+    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
 
     const tr = document.createElement('tr');
