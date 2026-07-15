@@ -1463,6 +1463,9 @@ async function openMultiInvoiceDetails(invoiceIds) {
     const headerTitle = document.querySelector('.modal-action-row h3');
     if (headerTitle) headerTitle.innerText = `Order: ${first.customer_name} (${invoices.length} Tickets)`;
 
+    const safeName = first.customer_name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
+    window.currentPrintTitle = `Invoice_Multiple_${safeName}`;
+
     const payBtn = document.getElementById('modal-pay-btn');
     const viewVchBtn = document.getElementById('modal-view-vch-btn');
     const pdfBtn = document.getElementById('modal-download-pdf-btn');
@@ -1631,6 +1634,9 @@ async function openInvoiceDetails(invoiceId) {
     // Set modal header title
     const headerTitle = document.querySelector('.modal-action-row h3');
     if (headerTitle) headerTitle.innerText = `Invoice #${inv.id}`;
+
+    const safeName = inv.customer_name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
+    window.currentPrintTitle = `Invoice_${inv.id}_${safeName}`;
 
     // Manage header action buttons
     const payBtn = document.getElementById('modal-pay-btn');
@@ -1859,6 +1865,11 @@ async function openVoucherModal(code) {
       pdfBtn.classList.remove('hidden');
       pdfBtn.onclick = () => downloadVoucherPDF(allCodes.join(','));
     }
+
+    const safeName = validVouchers[0].customer_name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
+    const firstCode = validVouchers[0].voucher_code;
+    const isMultiple = validVouchers.length > 1;
+    window.currentPrintTitle = isMultiple ? `Voucher_Multiple_${firstCode}_${safeName}` : `Voucher_${firstCode}_${safeName}`;
 
     const templatePicker = `
       <div class="flex items-center justify-center gap-2 mb-6 no-print">
@@ -2106,7 +2117,12 @@ async function openVoucherModal(code) {
 
 // Print trigger function
 function printModalContent() {
+  const originalTitle = document.title;
+  if (window.currentPrintTitle) {
+    document.title = window.currentPrintTitle;
+  }
   window.print();
+  document.title = originalTitle;
 }
 
 // PDF Download function - generates PDF from voucher HTML using html2pdf.js
@@ -2374,10 +2390,16 @@ async function downloadVoucherPDF(codes) {
     // Wait for Tailwind CDN to process the newly added classes
     await new Promise(resolve => setTimeout(resolve, 800));
 
+    // Determine filename for PDF
+    let finalFilename = `Voucher-${allCodes.join('-')}.pdf`;
+    if (window.currentPrintTitle) {
+      finalFilename = window.currentPrintTitle + '.pdf';
+    }
+
     // Generate PDF
     const opt = {
       margin: 0,
-      filename: `Voucher-${allCodes.join('-')}.pdf`,
+      filename: finalFilename,
       image: { type: 'jpeg', quality: 1.0 },
       html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
       jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
