@@ -164,6 +164,8 @@ async function initializeDatabase() {
       { key: 'merchant_email', value: 'info@baturhotspring.com' },
       { key: 'merchant_phone', value: '+62 812-3456-7890' },
       { key: 'merchant_logo_url', value: 'https://lh3.googleusercontent.com/aida/AP1WRLtiJ2K5eJTLjE8W7HzdMaUiQ08NqXBYN0NkHKcqPP927qeFtN-qilPR7-uIB-s_CmqdUTMB8yvgtAkSN5WMRu41-aTsWFU0pvTpPtYwqbVPCZXdGWDnSaYcbZBZl2u-lReVLYLPz6FECLtkHrc0TjMyeuzgmCjmwHqLPYiMkhXfePfB-dhd2zGBblCXN_dOL4i-ToFSBtDRAfHVk8UjpexxOnmFrdDuSFa_pfL0aBrRlEs1v1OR-ekiYIw' },
+      { key: 'merchant_terms', value: 'Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number at the main entrance gate.' },
+      { key: 'merchant_payment_instructions', value: 'Bank Transfer:\nBank Jago — 103494729785\na.n. Ida Ayu Gede Anindyatari\nSwift: JAGBIDJA\n\nPayPal:\narcomteknologi@gmail.com\n\nPlease send proof of payment to confirm your booking.' },
       { key: 'ninerouter_url', value: 'http://localhost:20128' },
       { key: 'ninerouter_key', value: '' },
       { key: 'ninerouter_model', value: 'gpt-4o-mini' },

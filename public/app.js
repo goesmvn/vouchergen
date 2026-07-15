@@ -273,6 +273,8 @@ function setupEventListeners() {
         merchant_phone: document.getElementById('settings-phone').value.trim(),
         merchant_address: document.getElementById('settings-address').value.trim(),
         merchant_logo_url: document.getElementById('settings-logo').value.trim(),
+        merchant_terms: document.getElementById('settings-terms').value.trim(),
+        merchant_payment_instructions: document.getElementById('settings-payment-instructions').value.trim(),
         ninerouter_url: appSettings.ninerouter_url || '',
         ninerouter_key: appSettings.ninerouter_key || '',
         ninerouter_model: appSettings.ninerouter_model || '',
@@ -801,6 +803,8 @@ function renderSettingsForm() {
   document.getElementById('settings-address').value = appSettings.merchant_address || '';
   document.getElementById('settings-logo').value = appSettings.merchant_logo_url || '';
   document.getElementById('settings-logo-preview').src = appSettings.merchant_logo_url || '';
+  document.getElementById('settings-terms').value = appSettings.merchant_terms || '';
+  document.getElementById('settings-payment-instructions').value = appSettings.merchant_payment_instructions || '';
   document.getElementById('settings-nvidia-key').value = appSettings.nvidia_api_key || '';
   document.getElementById('settings-nvidia-model').value = appSettings.nvidia_model || 'nvidia/llama-3.1-nemotron-70b-instruct';
   document.getElementById('settings-waha-url').value = appSettings.waha_url || '';
@@ -1632,20 +1636,11 @@ async function openMultiInvoiceDetails(invoiceIds) {
           <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 print:gap-4">
             <div>
               <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
-              <p>Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
+              <p class="whitespace-pre-wrap">${appSettings.merchant_terms || 'Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number at the main entrance gate.'}</p>
             </div>
             <div>
               <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Payment Instructions</h4>
-              <p class="mb-2"><strong>Transfer to:</strong><br>
-              Bank name: Bank Jago<br>
-              Account number: 103494729785<br>
-              Account name: Ida Ayu Gede Anindyatari<br>
-              Swift code: JAGBIDJA</p>
-              
-              <p class="mb-2"><strong>Payment can also be paid to PayPal:</strong><br>
-              Send payment to: arcomteknologi@gmail.com</p>
-              
-              <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
+              <p class="whitespace-pre-wrap">${appSettings.merchant_payment_instructions || 'Please complete transfer.'}</p>
             </div>
           </div>
         </div>
@@ -1818,20 +1813,11 @@ async function openInvoiceDetails(invoiceId) {
         <div class="inv-footer-info grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-200 pt-6">
           <div>
             <h4 class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Terms &amp; Conditions</h4>
-            <p class="text-xs text-gray-500 leading-relaxed">Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number at the main entrance gate.</p>
+            <p class="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">${appSettings.merchant_terms || 'Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number at the main entrance gate.'}</p>
           </div>
           <div>
             <h4 class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Payment Instructions</h4>
-            <p class="text-xs text-gray-500 leading-relaxed mb-2">
-              <strong class="text-gray-700">Bank Transfer:</strong><br>
-              Bank Jago — 103494729785<br>
-              a.n. Ida Ayu Gede Anindyatari<br>
-              Swift: JAGBIDJA
-            </p>
-            <p class="text-xs text-gray-500 leading-relaxed mb-2">
-              <strong class="text-gray-700">PayPal:</strong> arcomteknologi@gmail.com
-            </p>
-            <p class="proof-note text-xs font-semibold text-primary">Please send proof of payment to confirm your booking.</p>
+            <p class="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">${appSettings.merchant_payment_instructions || 'Please complete bank transfer to complete booking.'}</p>
           </div>
         </div>
 

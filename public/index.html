@@ -144,8 +144,8 @@
     /* Print Styles overrides */
     @media print {
       @page {
-        size: A4;
-        margin: 15mm 15mm 15mm 15mm;
+        size: A4 portrait;
+        margin: 15mm !important;
       }
 
       * {
@@ -155,6 +155,9 @@
       }
 
       body {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
         background-color: white !important;
         color: #1a1a1a !important;
         overflow: visible !important;
@@ -174,6 +177,7 @@
         margin: 0 !important;
         padding: 0 !important;
         width: 100% !important;
+        max-width: 100% !important;
       }
 
       .modal {
@@ -181,6 +185,7 @@
         top: auto !important;
         left: auto !important;
         width: 100% !important;
+        max-width: 100% !important;
         height: auto !important;
         display: block !important;
         background: transparent !important;
@@ -208,7 +213,7 @@
         border-radius: 6px !important;
         width: 100% !important;
         max-width: 100% !important;
-        margin: 0 !important;
+        margin: 0 auto !important;
         padding: 18pt 20pt !important;
         position: relative !important;
         break-inside: avoid !important;
@@ -1489,6 +1494,18 @@
               <div class="flex flex-col gap-1.5">
                 <label for="settings-address" class="text-xs font-bold uppercase text-on-surface-variant">Address / Location</label>
                 <textarea id="settings-address" rows="2" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary"></textarea>
+              </div>
+
+              <!-- Terms & Conditions -->
+              <div class="flex flex-col gap-1.5">
+                <label for="settings-terms" class="text-xs font-bold uppercase text-on-surface-variant">Terms &amp; Conditions</label>
+                <textarea id="settings-terms" rows="3" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary"></textarea>
+              </div>
+
+              <!-- Payment Instructions -->
+              <div class="flex flex-col gap-1.5">
+                <label for="settings-payment-instructions" class="text-xs font-bold uppercase text-on-surface-variant">Payment Instructions</label>
+                <textarea id="settings-payment-instructions" rows="6" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary"></textarea>
               </div>
 
               <!-- Logo URL -->
