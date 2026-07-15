@@ -1588,25 +1588,9 @@ async function openMultiInvoiceDetails(invoiceIds) {
           </table>
         </div>
 
-        <!-- Totals -->
-        <div class="flex flex-col md:flex-row print:flex-row justify-between items-end break-inside-avoid">
-          <div class="w-full md:w-[55%] print:w-[55%] mb-6 md:mb-0 print:mb-0 text-on-surface-variant font-body-md text-sm print:text-xs pr-4">
-            <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
-            <p class="mb-4">Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
-            
-            <h4 class="font-semibold text-on-surface mb-2">Payment Instructions</h4>
-            <p class="mb-2"><strong>Transfer to:</strong><br>
-            Bank name: Bank Jago<br>
-            Account number: 103494729785<br>
-            Account name: Ida Ayu Gede Anindyatari<br>
-            Swift code: JAGBIDJA</p>
-            
-            <p class="mb-2"><strong>Payment can also be paid to PayPal:</strong><br>
-            Send payment to: arcomteknologi@gmail.com</p>
-            
-            <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
-          </div>
-          <div class="w-full md:w-[40%] print:w-[40%] space-y-3 print:space-y-1">
+        <!-- Totals Section -->
+        <div class="flex flex-col items-end mb-8 print:mb-4 break-inside-avoid">
+          <div class="w-full sm:w-2/3 md:w-1/2 lg:w-2/5 print:w-[45%] space-y-3 print:space-y-1">
             ${(() => {
               const totalTicketDiscount = invoices.reduce((sum, inv) => {
                 const item = (inv.items && inv.items[0]) || {};
@@ -1616,30 +1600,53 @@ async function openMultiInvoiceDetails(invoiceIds) {
               return `
             <div class="flex justify-between font-body-md text-on-surface">
               <span>Subtotal:</span>
-              <span class="font-code-mono">Rp ${originalSubtotal.toLocaleString('id-ID')}</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${originalSubtotal.toLocaleString('id-ID')}</span>
             </div>
             ${totalTicketDiscount > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
               <span>Item Discounts:</span>
-              <span class="font-code-mono">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
+              <span class="font-code-mono whitespace-nowrap">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.discountRate > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
               <span>${discLabel} (${p.discountRate}%):</span>
-              <span class="font-code-mono">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
+              <span class="font-code-mono whitespace-nowrap">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.taxRate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
               <span>Tax (${p.taxRate}%):</span>
-              <span class="font-code-mono">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.serviceFee > 0 ? `<div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
               <span>Service Fee:</span>
-              <span class="font-code-mono">Rp ${p.serviceFee.toLocaleString('id-ID')}</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${p.serviceFee.toLocaleString('id-ID')}</span>
             </div>` : '<div class="border-b border-outline-variant pb-1"></div>'}
             <div class="flex justify-between items-center pt-2">
               <span class="font-headline-sm font-bold text-secondary">Total Due:</span>
-              <span class="font-headline-md font-bold text-secondary font-code-mono">Rp ${p.total.toLocaleString('id-ID')}</span>
+              <span class="font-headline-md font-bold text-secondary font-code-mono whitespace-nowrap">Rp ${p.total.toLocaleString('id-ID')}</span>
             </div>
               `;
             })()}
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="flex flex-col text-on-surface-variant font-body-md text-sm print:text-xs border-t border-outline-variant pt-6 print:pt-4 break-inside-avoid">
+          <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 print:gap-4">
+            <div>
+              <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
+              <p>Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
+            </div>
+            <div>
+              <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Payment Instructions</h4>
+              <p class="mb-2"><strong>Transfer to:</strong><br>
+              Bank name: Bank Jago<br>
+              Account number: 103494729785<br>
+              Account name: Ida Ayu Gede Anindyatari<br>
+              Swift code: JAGBIDJA</p>
+              
+              <p class="mb-2"><strong>Payment can also be paid to PayPal:</strong><br>
+              Send payment to: arcomteknologi@gmail.com</p>
+              
+              <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
+            </div>
           </div>
         </div>
 
@@ -1775,63 +1782,62 @@ async function openInvoiceDetails(invoiceId) {
               `).join('')}
             </tbody>
           </table>
-        </div>
-
-        <!-- Totals Section -->
-        <div class="flex flex-col md:flex-row print:flex-row justify-between items-end break-inside-avoid">
-          <div class="w-full md:w-[55%] print:w-[55%] mb-6 md:mb-0 print:mb-0 text-on-surface-variant font-body-md text-sm print:text-xs pr-4">
-            <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
-            <p class="mb-4">Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
-            
-            <h4 class="font-semibold text-on-surface mb-2">Payment Instructions</h4>
-            <p class="mb-2"><strong>Transfer to:</strong><br>
-            Bank name: Bank Jago<br>
-            Account number: 103494729785<br>
-            Account name: Ida Ayu Gede Anindyatari<br>
-            Swift code: JAGBIDJA</p>
-            
-            <p class="mb-2"><strong>Payment can also be paid to PayPal:</strong><br>
-            Send payment to: arcomteknologi@gmail.com</p>
-            
-            <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
-          </div>
-          <div class="w-full md:w-1/3 space-y-3">
+                <!-- Totals Section -->
+        <div class="flex flex-col items-end mb-8 print:mb-4 break-inside-avoid">
+          <div class="w-full sm:w-2/3 md:w-1/2 lg:w-2/5 print:w-[45%] space-y-3 print:space-y-1">
             ${(() => {
-              const totalTicketDiscount = (inv.items || []).reduce((sum, item) => sum + (item.ticket_discount || 0) * item.quantity, 0);
-              const p = calcPricing(inv.total_price);
-              const originalSubtotal = p.subtotal + totalTicketDiscount;
-              const discLabel = appSettings.discount_label || 'Diskon';
+              const totalTicketDiscount = (inv.items || []).reduce((sum, item) => sum + ((item.ticket_discount || 0) * item.quantity), 0);
+              const originalSubtotal = inv.subtotal + totalTicketDiscount;
               return `
-                <div class="flex justify-between font-body-md text-on-surface">
-                  <span>Subtotal:</span>
-                  <span class="font-code-mono">Rp ${originalSubtotal.toLocaleString('id-ID')}</span>
-                </div>
-                ${totalTicketDiscount > 0 ? `
-                <div class="flex justify-between font-body-md text-emerald-600">
-                  <span>Item Discounts:</span>
-                  <span class="font-code-mono">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
-                </div>` : ''}
-                ${p.discountRate > 0 ? `
-                <div class="flex justify-between font-body-md text-emerald-600">
-                  <span>${discLabel} ${p.discountType === 'percentage' ? `(${p.discountRate}%)` : ''}:</span>
-                  <span class="font-code-mono">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
-                </div>` : ''}
-                ${p.taxRate > 0 ? `
-                <div class="flex justify-between font-body-md text-on-surface">
-                  <span>Tax (${p.taxRate}%):</span>
-                  <span class="font-code-mono">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
-                </div>` : ''}
-                ${p.serviceFee > 0 ? `
-                <div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
-                  <span>Biaya Layanan:</span>
-                  <span class="font-code-mono">Rp ${p.serviceFee.toLocaleString('id-ID')}</span>
-                </div>` : '<div class="border-b border-outline-variant pb-1"></div>'}
-                <div class="flex justify-between items-center pt-2">
-                  <span class="font-headline-sm text-headline-sm font-bold text-secondary">Total Due:</span>
-                  <span class="font-headline-md text-headline-md font-bold text-secondary font-code-mono">Rp ${p.total.toLocaleString('id-ID')}</span>
-                </div>
+            <div class="flex justify-between font-body-md text-on-surface">
+              <span>Subtotal:</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${originalSubtotal.toLocaleString('id-ID')}</span>
+            </div>
+            ${totalTicketDiscount > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
+              <span>Item Discounts:</span>
+              <span class="font-code-mono whitespace-nowrap">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
+            </div>` : ''}
+            ${inv.discount_rate > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
+              <span>Discount (${inv.discount_rate}%):</span>
+              <span class="font-code-mono whitespace-nowrap">- Rp ${inv.discount_amount.toLocaleString('id-ID')}</span>
+            </div>` : ''}
+            ${inv.tax_rate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
+              <span>Tax (${inv.tax_rate}%):</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${inv.tax_amount.toLocaleString('id-ID')}</span>
+            </div>` : ''}
+            ${inv.service_fee > 0 ? `<div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
+              <span>Service Fee:</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${inv.service_fee.toLocaleString('id-ID')}</span>
+            </div>` : '<div class="border-b border-outline-variant pb-1"></div>'}
+            <div class="flex justify-between items-center pt-2">
+              <span class="font-headline-sm font-bold text-secondary">Total Due:</span>
+              <span class="font-headline-md font-bold text-secondary font-code-mono whitespace-nowrap">Rp ${inv.total_amount.toLocaleString('id-ID')}</span>
+            </div>
               `;
             })()}
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="flex flex-col text-on-surface-variant font-body-md text-sm print:text-xs border-t border-outline-variant pt-6 print:pt-4 break-inside-avoid">
+          <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 print:gap-4">
+            <div>
+              <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
+              <p>Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
+            </div>
+            <div>
+              <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Payment Instructions</h4>
+              <p class="mb-2"><strong>Transfer to:</strong><br>
+              Bank name: Bank Jago<br>
+              Account number: 103494729785<br>
+              Account name: Ida Ayu Gede Anindyatari<br>
+              Swift code: JAGBIDJA</p>
+              
+              <p class="mb-2"><strong>Payment can also be paid to PayPal:</strong><br>
+              Send payment to: arcomteknologi@gmail.com</p>
+              
+              <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
+            </div>
           </div>
         </div>
 
