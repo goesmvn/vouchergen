@@ -1787,7 +1787,9 @@ async function openInvoiceDetails(invoiceId) {
           <div class="w-full sm:w-2/3 md:w-1/2 lg:w-2/5 print:w-[45%] space-y-3 print:space-y-1">
             ${(() => {
               const totalTicketDiscount = (inv.items || []).reduce((sum, item) => sum + ((item.ticket_discount || 0) * item.quantity), 0);
-              const originalSubtotal = inv.subtotal + totalTicketDiscount;
+              const p = calcPricing(inv.total_price);
+              const originalSubtotal = p.subtotal + totalTicketDiscount;
+              const discLabel = appSettings.discount_label || 'Diskon';
               return `
             <div class="flex justify-between font-body-md text-on-surface">
               <span>Subtotal:</span>
@@ -1797,21 +1799,21 @@ async function openInvoiceDetails(invoiceId) {
               <span>Item Discounts:</span>
               <span class="font-code-mono whitespace-nowrap">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
             </div>` : ''}
-            ${inv.discount_rate > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
-              <span>Discount (${inv.discount_rate}%):</span>
-              <span class="font-code-mono whitespace-nowrap">- Rp ${inv.discount_amount.toLocaleString('id-ID')}</span>
+            ${p.discountRate > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
+              <span>${discLabel} (${p.discountRate}%):</span>
+              <span class="font-code-mono whitespace-nowrap">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
-            ${inv.tax_rate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
-              <span>Tax (${inv.tax_rate}%):</span>
-              <span class="font-code-mono whitespace-nowrap">Rp ${inv.tax_amount.toLocaleString('id-ID')}</span>
+            ${p.taxRate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
+              <span>Tax (${p.taxRate}%):</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
-            ${inv.service_fee > 0 ? `<div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
+            ${p.serviceFee > 0 ? `<div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
               <span>Service Fee:</span>
-              <span class="font-code-mono whitespace-nowrap">Rp ${inv.service_fee.toLocaleString('id-ID')}</span>
+              <span class="font-code-mono whitespace-nowrap">Rp ${p.serviceFee.toLocaleString('id-ID')}</span>
             </div>` : '<div class="border-b border-outline-variant pb-1"></div>'}
             <div class="flex justify-between items-center pt-2">
               <span class="font-headline-sm font-bold text-secondary">Total Due:</span>
-              <span class="font-headline-md font-bold text-secondary font-code-mono whitespace-nowrap">Rp ${inv.total_amount.toLocaleString('id-ID')}</span>
+              <span class="font-headline-md font-bold text-secondary font-code-mono whitespace-nowrap">Rp ${p.total.toLocaleString('id-ID')}</span>
             </div>
               `;
             })()}
