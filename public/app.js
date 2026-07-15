@@ -1538,7 +1538,7 @@ async function openMultiInvoiceDetails(invoiceIds) {
         <div class="h-2 bg-primary w-full absolute top-0 left-0"></div>
 
         <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start mb-10 gap-8 pt-4">
+        <div class="flex flex-col md:flex-row print:flex-row justify-between items-start mb-10 print:mb-4 gap-8 pt-4">
           <div>
             <div class="flex items-center gap-2 mb-4">
               <img src="${appSettings.merchant_logo_url || ''}" alt="Logo" class="h-12 object-contain bg-white rounded p-1 border border-outline-variant">
@@ -1566,15 +1566,15 @@ async function openMultiInvoiceDetails(invoiceIds) {
         </div>
 
         <!-- Billed To -->
-        <div class="bg-surface-container-low p-6 rounded-lg mb-10">
-          <h3 class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant mb-2">Billed To:</h3>
+        <div class="bg-surface-container-low p-6 print:p-4 rounded-lg mb-10 print:mb-4">
+          <h3 class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant mb-2 print:mb-1">Billed To:</h3>
           <p class="font-headline-sm font-semibold text-on-surface">${first.customer_name}</p>
           <p class="text-sm text-on-surface-variant mt-1">${invoices.length} Ticket Types</p>
         </div>
 
         <!-- Items Table -->
-        <div class="mb-10 overflow-x-auto">
-          <table class="w-full text-left border-collapse min-w-[600px]">
+        <div class="mb-10 print:mb-4 overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[600px] print:min-w-0">
             <thead>
               <tr class="bg-surface-container-low border-b border-outline-variant">
                 <th class="py-3 px-4 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant w-2/5">Ticket</th>
@@ -1589,9 +1589,9 @@ async function openMultiInvoiceDetails(invoiceIds) {
         </div>
 
         <!-- Totals -->
-        <div class="flex flex-col md:flex-row justify-between items-end">
-          <div class="w-full md:w-1/2 mb-6 md:mb-0 text-on-surface-variant font-body-md text-sm pr-4">
-            <h4 class="font-semibold text-on-surface mb-2">Terms &amp; Conditions</h4>
+        <div class="flex flex-col md:flex-row print:flex-row justify-between items-end break-inside-avoid">
+          <div class="w-full md:w-[55%] print:w-[55%] mb-6 md:mb-0 print:mb-0 text-on-surface-variant font-body-md text-sm print:text-xs pr-4">
+            <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
             <p class="mb-4">Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
             
             <h4 class="font-semibold text-on-surface mb-2">Payment Instructions</h4>
@@ -1606,7 +1606,7 @@ async function openMultiInvoiceDetails(invoiceIds) {
             
             <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
           </div>
-          <div class="w-full md:w-1/3 space-y-3">
+          <div class="w-full md:w-[40%] print:w-[40%] space-y-3 print:space-y-1">
             ${(() => {
               const totalTicketDiscount = invoices.reduce((sum, inv) => {
                 const item = (inv.items && inv.items[0]) || {};
@@ -1643,7 +1643,7 @@ async function openMultiInvoiceDetails(invoiceIds) {
           </div>
         </div>
 
-        <div class="bg-surface-container px-8 py-6 text-center border-t border-outline-variant mt-8 -mx-8 -mb-8 md:-mx-10 md:-mb-10">
+        <div class="bg-surface-container px-8 py-6 print:py-4 text-center border-t border-outline-variant mt-8 print:mt-4 -mx-8 -mb-8 md:-mx-10 md:-mb-10">
           <p class="font-body-md text-on-surface-variant">Thank you for visiting ${appSettings.merchant_name || 'Batur Natural Hot Spring'}!</p>
         </div>
       </div>
@@ -1701,7 +1701,7 @@ async function openInvoiceDetails(invoiceId) {
         <div class="h-2 bg-primary w-full absolute top-0 left-0"></div>
         
         <!-- Invoice Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start mb-12 gap-8 pt-4">
+        <div class="flex flex-col md:flex-row print:flex-row justify-between items-start mb-12 print:mb-4 gap-8 pt-4">
           <!-- Park Info -->
           <div>
             <div class="flex items-center gap-2 mb-4">
@@ -1734,9 +1734,9 @@ async function openInvoiceDetails(invoiceId) {
         </div>
 
         <!-- Customer Info Container (Subtle gray background) -->
-        <div class="bg-surface-container-low p-6 rounded-lg mb-10 flex flex-col md:flex-row justify-between">
+        <div class="bg-surface-container-low p-6 print:p-4 rounded-lg mb-10 print:mb-4 flex flex-col md:flex-row print:flex-row justify-between">
           <div>
-            <h3 class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant mb-2">Billed To:</h3>
+            <h3 class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant mb-2 print:mb-1">Billed To:</h3>
             <p class="font-headline-sm text-headline-sm font-semibold text-on-surface">${inv.customer_name}</p>
             <p class="font-body-md text-body-md text-on-surface-variant mt-1">Guest at Toya Bungkah</p>
           </div>
@@ -1747,8 +1747,8 @@ async function openInvoiceDetails(invoiceId) {
         </div>
 
         <!-- Itemized Table -->
-        <div class="mb-10 overflow-x-auto">
-          <table class="w-full text-left border-collapse min-w-[600px]">
+        <div class="mb-10 print:mb-4 overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[600px] print:min-w-0">
             <thead>
               <tr class="bg-surface-container-low border-b border-outline-variant">
                 <th class="py-3 px-4 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant w-1/2">Description</th>
@@ -1778,9 +1778,9 @@ async function openInvoiceDetails(invoiceId) {
         </div>
 
         <!-- Totals Section -->
-        <div class="flex flex-col md:flex-row justify-between items-end">
-          <div class="w-full md:w-1/2 mb-6 md:mb-0 text-on-surface-variant font-body-md text-sm pr-4">
-            <h4 class="font-semibold text-on-surface mb-2">Terms &amp; Conditions</h4>
+        <div class="flex flex-col md:flex-row print:flex-row justify-between items-end break-inside-avoid">
+          <div class="w-full md:w-[55%] print:w-[55%] mb-6 md:mb-0 print:mb-0 text-on-surface-variant font-body-md text-sm print:text-xs pr-4">
+            <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
             <p class="mb-4">Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
             
             <h4 class="font-semibold text-on-surface mb-2">Payment Instructions</h4>
@@ -1836,9 +1836,8 @@ async function openInvoiceDetails(invoiceId) {
         </div>
 
         <!-- Footer area of invoice -->
-        <div class="bg-surface-container px-8 py-6 text-center border-t border-outline-variant mt-8 -mx-8 -mb-8 md:-mx-10 md:-mb-10">
-          <p class="font-body-md text-on-surface-variant">Thank you for visiting Batur Natural Hot Spring!</p>
-          <p class="font-label-md text-xs text-outline mt-2 uppercase tracking-wide">Generated by Batur Hot Spring Management System</p>
+        <div class="bg-surface-container px-8 py-6 print:py-4 text-center border-t border-outline-variant mt-8 print:mt-4 -mx-8 -mb-8 md:-mx-10 md:-mb-10">
+          <p class="font-body-md text-on-surface-variant">Thank you for visiting ${appSettings.merchant_name || 'Batur Natural Hot Spring'}!</p>
         </div>
       </div>
     `;
