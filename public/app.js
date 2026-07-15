@@ -1494,17 +1494,27 @@ async function openMultiInvoiceDetails(invoiceIds) {
       };
     }
 
-    // Table rows: 1 row per ticket type
-    const tableRows = invoices.map(inv => `
+    // Table rows: 1 row per ticket type (which is 1 invoice in this case)
+    const tableRows = invoices.map(inv => {
+      const item = (inv.items && inv.items[0]) || {};
+      const tTitle = item.ticket_title || '-';
+      const tPrice = item.ticket_price || (inv.total_price / inv.quantity);
+      const tDisc = item.ticket_discount || 0;
+
+      return `
       <tr class="border-b border-outline-variant hover:bg-surface transition-colors">
         <td class="py-4 px-4">
-          <div class="font-semibold">${inv.ticket_title}</div>
+          <div class="font-semibold">${tTitle}</div>
+          ${tDisc > 0 ? `<div class="text-emerald-600 text-xs font-semibold mt-1">Includes Rp ${tDisc.toLocaleString('id-ID')} discount</div>` : ''}
           <div class="flex items-center gap-2 mt-1">
             <span class="badge ${inv.current_status === 'Paid' ? 'badge-paid' : inv.current_status === 'Redeemed' ? 'badge-redeemed' : 'badge-unpaid'} text-[9px] px-2 py-0.5">${inv.current_status.toUpperCase()}</span>
             ${inv.voucher_code ? `<span class="font-mono text-xs text-on-surface-variant">${inv.voucher_code}</span>` : ''}
           </div>
         </td>
-        <td class="py-4 px-4 text-right">Rp ${(inv.total_price / inv.quantity).toLocaleString('id-ID')}</td>
+        <td class="py-4 px-4 text-right">
+          ${tDisc > 0 ? `<div class="line-through text-on-surface-variant text-xs">Rp ${tPrice.toLocaleString('id-ID')}</div>` : ''}
+          <div class="${tDisc > 0 ? 'text-emerald-600 font-semibold' : ''}">Rp ${(tPrice - tDisc).toLocaleString('id-ID')}</div>
+        </td>
         <td class="py-4 px-4 text-center">${inv.quantity}</td>
         <td class="py-4 px-4 text-right font-code-mono">Rp ${inv.total_price.toLocaleString('id-ID')}</td>
         <td class="py-4 px-4 text-center">
@@ -1514,7 +1524,8 @@ async function openMultiInvoiceDetails(invoiceIds) {
           }
         </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
 
     const subtotalAll = invoices.reduce((s, i) => s + i.total_price, 0);
     const p = calcPricing(subtotalAll);
@@ -1727,8 +1738,12 @@ async function openInvoiceDetails(invoiceId) {
                   <td class="py-4 px-4">
                     <div class="font-semibold">${item.ticket_title}</div>
                     <div class="text-on-surface-variant text-sm mt-1">Access to natural hot spring pools.</div>
+                    ${item.ticket_discount > 0 ? `<div class="text-emerald-600 text-xs font-semibold mt-1">Includes Rp ${item.ticket_discount.toLocaleString('id-ID')} discount per ticket</div>` : ''}
                   </td>
-                  <td class="py-4 px-4 text-right">Rp ${item.ticket_price.toLocaleString('id-ID')}</td>
+                  <td class="py-4 px-4 text-right">
+                    ${item.ticket_discount > 0 ? `<div class="line-through text-on-surface-variant text-xs">Rp ${item.ticket_price.toLocaleString('id-ID')}</div>` : ''}
+                    <div class="${item.ticket_discount > 0 ? 'text-emerald-600 font-semibold' : ''}">Rp ${(item.ticket_price - (item.ticket_discount || 0)).toLocaleString('id-ID')}</div>
+                  </td>
                   <td class="py-4 px-4 text-center">${item.quantity}</td>
                   <td class="py-4 px-4 text-right font-code-mono">Rp ${item.total_price.toLocaleString('id-ID')}</td>
                 </tr>
