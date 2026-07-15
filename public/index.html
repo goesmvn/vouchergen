@@ -143,51 +143,414 @@
 
     /* Print Styles overrides */
     @media print {
+      @page {
+        size: A4;
+        margin: 15mm 15mm 15mm 15mm;
+      }
+
       * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        box-sizing: border-box;
       }
+
       body {
         background-color: white !important;
-        color: black !important;
+        color: #1a1a1a !important;
         overflow: visible !important;
         height: auto !important;
+        font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
+        font-size: 9pt !important;
+        line-height: 1.4 !important;
       }
-      #login-section, #dashboard-section, .no-print, nav, aside, header, .modal-overlay, .modal-close-btn, .modal-action-row, button {
+
+      #login-section, #dashboard-section, .no-print, nav, aside, header,
+      .modal-overlay, .modal-close-btn, .modal-action-row, button,
+      .watermark, .orb, .toast {
         display: none !important;
       }
+
       main {
         margin: 0 !important;
         padding: 0 !important;
         width: 100% !important;
       }
+
       .modal {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
         width: 100% !important;
         height: auto !important;
         display: block !important;
         background: transparent !important;
         padding: 0 !important;
         margin: 0 !important;
+        overflow: visible !important;
       }
+
       .modal-content {
         max-width: 100% !important;
+        width: 100% !important;
         box-shadow: none !important;
         border: none !important;
         background: transparent !important;
         padding: 0 !important;
         margin: 0 !important;
+        overflow: visible !important;
+        max-height: none !important;
       }
-      .invoice-container, .ticket-container {
+
+      /* Invoice container: full width, clean border */
+      .invoice-container {
         box-shadow: none !important;
-        border: 1px solid #e1e3e4 !important;
+        border: 1px solid #d0d5dd !important;
+        border-radius: 6px !important;
+        width: 100% !important;
         max-width: 100% !important;
-        margin: 0 auto !important;
-        page-break-inside: avoid !important;
+        margin: 0 !important;
+        padding: 18pt 20pt !important;
+        position: relative !important;
         break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        overflow: visible !important;
       }
+
+      /* Top accent bar */
+      .invoice-container .inv-topbar {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 5pt !important;
+        background: #006c4a !important;
+        border-radius: 6px 6px 0 0 !important;
+      }
+
+      /* === HEADER SECTION === */
+      .inv-header {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        margin-bottom: 12pt !important;
+        padding-top: 8pt !important;
+        gap: 16pt !important;
+      }
+
+      .inv-merchant-info img {
+        height: 32pt !important;
+        max-height: 32pt !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin-bottom: 6pt !important;
+      }
+
+      .inv-merchant-info p {
+        margin: 1pt 0 !important;
+        font-size: 8pt !important;
+        color: #4a5568 !important;
+        line-height: 1.4 !important;
+      }
+
+      .inv-merchant-info p.merchant-name {
+        font-size: 9pt !important;
+        font-weight: 700 !important;
+        color: #1a1a1a !important;
+      }
+
+      .inv-id-block {
+        text-align: right !important;
+      }
+
+      .inv-id-block h1 {
+        font-size: 22pt !important;
+        font-weight: 800 !important;
+        color: #006c4a !important;
+        margin: 0 0 6pt 0 !important;
+        letter-spacing: 1pt !important;
+        font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif !important;
+      }
+
+      .inv-id-block table {
+        border: none !important;
+        border-collapse: collapse !important;
+        margin-left: auto !important;
+      }
+
+      .inv-id-block table td {
+        font-size: 8pt !important;
+        padding: 1pt 3pt !important;
+        border: none !important;
+        color: #4a5568 !important;
+        line-height: 1.5 !important;
+      }
+
+      .inv-id-block table td.label {
+        font-weight: 600 !important;
+        color: #1a1a1a !important;
+        text-align: right !important;
+        padding-right: 6pt !important;
+      }
+
+      .inv-id-block table td.value {
+        text-align: left !important;
+        font-family: 'Courier New', monospace !important;
+      }
+
+      /* === CUSTOMER INFO BAR === */
+      .inv-customer-bar {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        background: #f7f8fa !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 5pt !important;
+        padding: 8pt 12pt !important;
+        margin-bottom: 10pt !important;
+      }
+
+      .inv-customer-bar .bill-to-label,
+      .inv-customer-bar .ref-label {
+        font-size: 7pt !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5pt !important;
+        color: #6b7280 !important;
+        margin-bottom: 2pt !important;
+      }
+
+      .inv-customer-bar .customer-name {
+        font-size: 11pt !important;
+        font-weight: 700 !important;
+        color: #1a1a1a !important;
+        font-family: 'Manrope', Arial, sans-serif !important;
+        margin: 0 !important;
+      }
+
+      .inv-customer-bar .customer-sub {
+        font-size: 7.5pt !important;
+        color: #6b7280 !important;
+        margin: 1pt 0 0 0 !important;
+      }
+
+      .inv-customer-bar .ref-code {
+        font-family: 'Courier New', monospace !important;
+        font-size: 9pt !important;
+        font-weight: 600 !important;
+        color: #1a1a1a !important;
+        margin: 0 !important;
+      }
+
+      /* === ITEM TABLE === */
+      .inv-table-wrap {
+        margin-bottom: 8pt !important;
+        overflow: visible !important;
+      }
+
+      .inv-items-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 8.5pt !important;
+        table-layout: fixed !important;
+      }
+
+      .inv-items-table thead tr {
+        background: #f7f8fa !important;
+      }
+
+      .inv-items-table thead th {
+        padding: 6pt 8pt !important;
+        font-size: 7pt !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.4pt !important;
+        color: #6b7280 !important;
+        border-bottom: 2px solid #006c4a !important;
+        border-top: 1px solid #e2e8f0 !important;
+        white-space: nowrap !important;
+      }
+
+      .inv-items-table tbody tr {
+        border-bottom: 1px solid #f0f0f0 !important;
+      }
+
+      .inv-items-table tbody td {
+        padding: 6pt 8pt !important;
+        vertical-align: top !important;
+        color: #1a1a1a !important;
+        word-break: break-word !important;
+      }
+
+      .inv-items-table .td-desc {
+        width: 44% !important;
+      }
+
+      .inv-items-table .td-price {
+        width: 20% !important;
+        text-align: right !important;
+      }
+
+      .inv-items-table .td-qty {
+        width: 10% !important;
+        text-align: center !important;
+      }
+
+      .inv-items-table .td-sub {
+        width: 20% !important;
+        text-align: right !important;
+        font-family: 'Courier New', monospace !important;
+      }
+
+      .inv-items-table .item-title {
+        font-weight: 600 !important;
+        font-size: 8.5pt !important;
+        color: #1a1a1a !important;
+      }
+
+      .inv-items-table .item-desc {
+        font-size: 7pt !important;
+        color: #6b7280 !important;
+        margin-top: 1pt !important;
+      }
+
+      .inv-items-table .item-disc {
+        font-size: 7pt !important;
+        color: #059669 !important;
+        font-weight: 600 !important;
+        margin-top: 1pt !important;
+      }
+
+      .inv-items-table .price-orig {
+        text-decoration: line-through !important;
+        color: #9ca3af !important;
+        font-size: 7pt !important;
+        display: block !important;
+      }
+
+      .inv-items-table .price-net {
+        font-weight: 600 !important;
+        color: #059669 !important;
+      }
+
+      .inv-items-table .price-normal {
+        color: #1a1a1a !important;
+      }
+
+      /* === TOTALS === */
+      .inv-totals-block {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: flex-end !important;
+        margin-bottom: 10pt !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      .inv-totals-inner {
+        width: 42% !important;
+        min-width: 140pt !important;
+      }
+
+      .inv-totals-inner .total-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 2pt 0 !important;
+        font-size: 8.5pt !important;
+        color: #374151 !important;
+      }
+
+      .inv-totals-inner .total-row.discount {
+        color: #059669 !important;
+      }
+
+      .inv-totals-inner .total-row .amount {
+        font-family: 'Courier New', monospace !important;
+        white-space: nowrap !important;
+        font-size: 8.5pt !important;
+      }
+
+      .inv-totals-inner .total-divider {
+        border: none !important;
+        border-top: 1px solid #d1d5db !important;
+        margin: 4pt 0 !important;
+      }
+
+      .inv-totals-inner .total-row.grand-total {
+        padding-top: 4pt !important;
+        border-top: 2px solid #006c4a !important;
+        margin-top: 2pt !important;
+      }
+
+      .inv-totals-inner .total-row.grand-total .label {
+        font-size: 10pt !important;
+        font-weight: 800 !important;
+        color: #006c4a !important;
+        font-family: 'Manrope', Arial, sans-serif !important;
+      }
+
+      .inv-totals-inner .total-row.grand-total .amount {
+        font-size: 11pt !important;
+        font-weight: 800 !important;
+        color: #006c4a !important;
+      }
+
+      /* === FOOTER INFO === */
+      .inv-footer-info {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10pt !important;
+        border-top: 1px solid #e2e8f0 !important;
+        padding-top: 8pt !important;
+        margin-top: 0 !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      .inv-footer-info h4 {
+        font-size: 7.5pt !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.4pt !important;
+        color: #374151 !important;
+        margin: 0 0 4pt 0 !important;
+      }
+
+      .inv-footer-info p {
+        font-size: 7.5pt !important;
+        color: #6b7280 !important;
+        margin: 0 0 4pt 0 !important;
+        line-height: 1.5 !important;
+      }
+
+      .inv-footer-info strong {
+        color: #374151 !important;
+        font-weight: 600 !important;
+      }
+
+      .inv-footer-info .proof-note {
+        color: #006c4a !important;
+        font-weight: 600 !important;
+        font-size: 7.5pt !important;
+      }
+
+      /* === BOTTOM THANK YOU === */
+      .inv-bottom-bar {
+        background: #f7f8fa !important;
+        text-align: center !important;
+        padding: 7pt !important;
+        margin: 8pt -20pt -18pt -20pt !important;
+        border-top: 1px solid #e2e8f0 !important;
+        border-radius: 0 0 6px 6px !important;
+        font-size: 8pt !important;
+        color: #6b7280 !important;
+      }
+
+      /* status badge in header */
+      .inv-status-paid { color: #059669 !important; font-weight: 700 !important; }
+      .inv-status-unpaid { color: #dc2626 !important; font-weight: 700 !important; }
     }
     /* Badge Styles */
     .badge {

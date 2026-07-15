@@ -1701,151 +1701,143 @@ async function openInvoiceDetails(invoiceId) {
     }
 
     modalBody.innerHTML = `
-      <div class="invoice-container max-w-4xl mx-auto bg-surface-container-lowest shadow-[0px_2px_4px_rgba(0,0,0,0.05)] rounded-xl overflow-hidden relative border border-outline-variant p-8 md:p-10">
-        <!-- Watermark -->
-        ${(isPaid || isRedeemed) ? `<div class="watermark font-display-lg text-primary/5">PAID</div>` : `<div class="watermark font-display-lg text-red-500/5">UNPAID</div>`}
-        <!-- Green Top Bar -->
-        <div class="h-2 bg-primary w-full absolute top-0 left-0"></div>
-        
-        <!-- Invoice Header -->
-        <div class="flex flex-col md:flex-row print:flex-row justify-between items-start mb-12 print:mb-4 gap-8 pt-4">
-          <!-- Park Info -->
-          <div>
-            <div class="flex items-center gap-2 mb-4">
-              <img src="${appSettings.merchant_logo_url || 'https://lh3.googleusercontent.com/aida/AP1WRLtiJ2K5eJTLjE8W7HzdMaUiQ08NqXBYN0NkHKcqPP927qeFtN-qilPR7-uIB-s_CmqdUTMB8yvgtAkSN5WMRu41-aTsWFU0pvTpPtYwqbVPCZXdGWDnSaYcbZBZl2u-lReVLYLPz6FECLtkHrc0TjMyeuzgmCjmwHqLPYiMkhXfePfB-dhd2zGBblCXN_dOL4i-ToFSBtDRAfHVk8UjpexxOnmFrdDuSFa_pfL0aBrRlEs1v1OR-ekiYIw'}" alt="${appSettings.merchant_name || 'Batur Hot Spring'} Logo" class="h-12 object-contain bg-white rounded p-1 border border-outline-variant">
-            </div>
-            <div class="font-body-md text-body-md text-on-surface-variant space-y-1">
-              <p class="font-semibold text-on-surface">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</p>
-              <p class="whitespace-pre-wrap">${appSettings.merchant_address || 'Toya Bungkah, Kintamani, Bangli, Bali'}</p>
-              <p class="">${appSettings.merchant_email || 'info@baturhotspring.com'}</p>
-              <p class="">${appSettings.merchant_phone || '+62 812-3456-7890'}</p>
-            </div>
+      <div class="invoice-container max-w-4xl mx-auto bg-white shadow-sm rounded-xl overflow-hidden relative border border-gray-200 p-8 md:p-10">
+        <!-- Top accent bar -->
+        <div class="inv-topbar h-2 bg-primary w-full absolute top-0 left-0 rounded-t-xl"></div>
+
+        <!-- HEADER -->
+        <div class="inv-header flex flex-col md:flex-row justify-between items-start gap-8 pt-6 mb-10">
+          <!-- Merchant Info -->
+          <div class="inv-merchant-info">
+            <img src="${appSettings.merchant_logo_url || ''}" alt="${appSettings.merchant_name || 'Logo'}" class="h-12 object-contain mb-3">
+            <p class="merchant-name font-bold text-gray-900">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</p>
+            <p class="text-gray-500 whitespace-pre-wrap">${appSettings.merchant_address || 'Toya Bungkah, Kintamani, Bangli, Bali'}</p>
+            <p class="text-gray-500">${appSettings.merchant_email || ''}</p>
+            <p class="text-gray-500">${appSettings.merchant_phone || ''}</p>
           </div>
-          <!-- Invoice Details -->
-          <div class="text-left md:text-right">
-            <h1 class="font-display-lg text-display-lg font-bold text-primary mb-2">INVOICE</h1>
-            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-body-md">
-              <span class="font-semibold text-on-surface text-left md:text-right">Invoice ID:</span>
-              <span class="text-on-surface-variant font-code-mono text-left md:text-right">#INV-${inv.id}</span>
-              <span class="font-semibold text-on-surface text-left md:text-right">Date Issued:</span>
-              <span class="text-on-surface-variant text-left md:text-right">${new Date(inv.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              <span class="font-semibold text-on-surface text-left md:text-right">Payment Method:</span>
-              <span class="text-on-surface-variant text-left md:text-right">${inv.payment_method}</span>
-              <span class="font-semibold text-on-surface text-left md:text-right">Status:</span>
-              <span class="font-bold flex items-center justify-start md:justify-end gap-1 ${isPaid || isRedeemed ? 'text-primary' : 'text-red-500'}">
-                <span class="material-symbols-outlined text-[16px]">${isPaid || isRedeemed ? 'check_circle' : 'pending'}</span>
-                ${inv.current_status.toUpperCase()}
-              </span>
-            </div>
+          <!-- Invoice ID Block -->
+          <div class="inv-id-block text-right">
+            <h1 class="text-4xl font-extrabold text-primary tracking-wide mb-3">INVOICE</h1>
+            <table class="ml-auto">
+              <tr><td class="label font-semibold text-right pr-3 text-gray-700">Invoice ID:</td><td class="value font-mono text-gray-600">#INV-${inv.id}</td></tr>
+              <tr><td class="label font-semibold text-right pr-3 text-gray-700">Date Issued:</td><td class="value text-gray-600">${new Date(inv.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
+              <tr><td class="label font-semibold text-right pr-3 text-gray-700">Payment:</td><td class="value text-gray-600">${inv.payment_method}</td></tr>
+              <tr><td class="label font-semibold text-right pr-3 text-gray-700">Status:</td><td class="value ${isPaid || isRedeemed ? 'inv-status-paid text-green-600' : 'inv-status-unpaid text-red-500'} font-bold">${inv.current_status.toUpperCase()}</td></tr>
+            </table>
           </div>
         </div>
 
-        <!-- Customer Info Container (Subtle gray background) -->
-        <div class="bg-surface-container-low p-6 print:p-4 rounded-lg mb-10 print:mb-4 flex flex-col md:flex-row print:flex-row justify-between">
+        <!-- CUSTOMER BAR -->
+        <div class="inv-customer-bar flex flex-col md:flex-row justify-between bg-gray-50 border border-gray-200 rounded-lg px-6 py-4 mb-8">
           <div>
-            <h3 class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant mb-2 print:mb-1">Billed To:</h3>
-            <p class="font-headline-sm text-headline-sm font-semibold text-on-surface">${inv.customer_name}</p>
-            <p class="font-body-md text-body-md text-on-surface-variant mt-1">Guest at Toya Bungkah</p>
+            <p class="bill-to-label text-xs uppercase tracking-widest text-gray-400 mb-1 font-bold">Billed To</p>
+            <p class="customer-name text-xl font-bold text-gray-900">${inv.customer_name}</p>
+            <p class="customer-sub text-sm text-gray-500 mt-0.5">Guest Visitor</p>
           </div>
-          <div class="mt-4 md:mt-0">
-            <h3 class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant mb-2">Order Reference:</h3>
-            <p class="font-code-mono text-code-mono text-on-surface">${inv.voucher_code || 'PENDING'}</p>
+          <div class="mt-3 md:mt-0 text-left md:text-right">
+            <p class="ref-label text-xs uppercase tracking-widest text-gray-400 mb-1 font-bold">Order Reference</p>
+            <p class="ref-code font-mono text-base font-semibold text-gray-800">${inv.voucher_code || '—'}</p>
           </div>
         </div>
 
-        <!-- Itemized Table -->
-        <div class="mb-10 print:mb-4 overflow-x-auto">
-          <table class="w-full text-left border-collapse min-w-[600px] print:min-w-0">
+        <!-- ITEMS TABLE -->
+        <div class="inv-table-wrap mb-8 overflow-x-auto">
+          <table class="inv-items-table w-full border-collapse text-sm">
             <thead>
-              <tr class="bg-surface-container-low border-b border-outline-variant">
-                <th class="py-3 px-4 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant w-1/2">Description</th>
-                <th class="py-3 px-4 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant text-right">Price</th>
-                <th class="py-3 px-4 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant text-center">Qty</th>
-                <th class="py-3 px-4 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant text-right">Subtotal</th>
+              <tr class="bg-gray-50">
+                <th class="td-desc py-3 px-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 border-b-2 border-primary">Description</th>
+                <th class="td-price py-3 px-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 border-b-2 border-primary">Price/Unit</th>
+                <th class="td-qty py-3 px-3 text-center text-xs font-bold uppercase tracking-wider text-gray-500 border-b-2 border-primary">Qty</th>
+                <th class="td-sub py-3 px-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 border-b-2 border-primary">Subtotal</th>
               </tr>
             </thead>
-            <tbody class="font-body-md text-body-md text-on-surface">
+            <tbody>
               ${(inv.items || []).map(item => `
-                <tr class="border-b border-outline-variant hover:bg-surface transition-colors">
-                  <td class="py-4 px-4">
-                    <div class="font-semibold">${item.ticket_title}</div>
-                    <div class="text-on-surface-variant text-sm mt-1">Access to natural hot spring pools.</div>
-                    ${item.ticket_discount > 0 ? `<div class="text-emerald-600 text-xs font-semibold mt-1">Includes Rp ${item.ticket_discount.toLocaleString('id-ID')} discount per ticket</div>` : ''}
+                <tr class="border-b border-gray-100">
+                  <td class="td-desc py-4 px-3">
+                    <div class="item-title font-semibold text-gray-900">${item.ticket_title}</div>
+                    <div class="item-desc text-xs text-gray-400 mt-0.5">Admission to hot spring pools</div>
+                    ${item.ticket_discount > 0 ? `<div class="item-disc text-xs text-green-600 font-semibold mt-0.5">Disc. Rp ${item.ticket_discount.toLocaleString('id-ID')}/ticket</div>` : ''}
                   </td>
-                  <td class="py-4 px-4 text-right">
-                    ${item.ticket_discount > 0 ? `<div class="line-through text-on-surface-variant text-xs">Rp ${item.ticket_price.toLocaleString('id-ID')}</div>` : ''}
-                    <div class="${item.ticket_discount > 0 ? 'text-emerald-600 font-semibold' : ''}">Rp ${(item.ticket_price - (item.ticket_discount || 0)).toLocaleString('id-ID')}</div>
+                  <td class="td-price py-4 px-3 text-right align-top">
+                    ${item.ticket_discount > 0 ? `<span class="price-orig text-xs line-through text-gray-400 block">Rp ${item.ticket_price.toLocaleString('id-ID')}</span>` : ''}
+                    <span class="${item.ticket_discount > 0 ? 'price-net text-green-600 font-semibold' : 'price-normal text-gray-800'}">Rp ${(item.ticket_price - (item.ticket_discount || 0)).toLocaleString('id-ID')}</span>
                   </td>
-                  <td class="py-4 px-4 text-center">${item.quantity}</td>
-                  <td class="py-4 px-4 text-right font-code-mono">Rp ${item.total_price.toLocaleString('id-ID')}</td>
+                  <td class="td-qty py-4 px-3 text-center align-top text-gray-700">${item.quantity}</td>
+                  <td class="td-sub py-4 px-3 text-right align-top font-mono text-gray-800">Rp ${item.total_price.toLocaleString('id-ID')}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
-                <!-- Totals Section -->
-        <div class="flex flex-col items-end mb-8 print:mb-4 break-inside-avoid">
-          <div class="w-full sm:w-2/3 md:w-1/2 lg:w-2/5 print:w-[45%] space-y-3 print:space-y-1">
+        </div>
+
+        <!-- TOTALS -->
+        <div class="inv-totals-block flex justify-end mb-8">
+          <div class="inv-totals-inner w-full md:w-2/5 space-y-1.5">
             ${(() => {
               const totalTicketDiscount = (inv.items || []).reduce((sum, item) => sum + ((item.ticket_discount || 0) * item.quantity), 0);
               const p = calcPricing(inv.total_price);
               const originalSubtotal = p.subtotal + totalTicketDiscount;
               const discLabel = appSettings.discount_label || 'Diskon';
               return `
-            <div class="flex justify-between font-body-md text-on-surface">
-              <span>Subtotal:</span>
-              <span class="font-code-mono whitespace-nowrap">Rp ${originalSubtotal.toLocaleString('id-ID')}</span>
+            <div class="total-row flex justify-between text-gray-700">
+              <span>Subtotal</span>
+              <span class="amount font-mono whitespace-nowrap">Rp ${originalSubtotal.toLocaleString('id-ID')}</span>
             </div>
-            ${totalTicketDiscount > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
-              <span>Item Discounts:</span>
-              <span class="font-code-mono whitespace-nowrap">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
+            ${totalTicketDiscount > 0 ? `
+            <div class="total-row discount flex justify-between text-green-600">
+              <span>Item Discounts</span>
+              <span class="amount font-mono whitespace-nowrap">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
             </div>` : ''}
-            ${p.discountRate > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
-              <span>${discLabel} (${p.discountRate}%):</span>
-              <span class="font-code-mono whitespace-nowrap">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
+            ${p.discountRate > 0 ? `
+            <div class="total-row discount flex justify-between text-green-600">
+              <span>${discLabel} (${p.discountRate}%)</span>
+              <span class="amount font-mono whitespace-nowrap">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
-            ${p.taxRate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
-              <span>Tax (${p.taxRate}%):</span>
-              <span class="font-code-mono whitespace-nowrap">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
+            ${p.taxRate > 0 ? `
+            <div class="total-row flex justify-between text-gray-700">
+              <span>Tax (${p.taxRate}%)</span>
+              <span class="amount font-mono whitespace-nowrap">Rp ${p.taxAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
-            ${p.serviceFee > 0 ? `<div class="flex justify-between font-body-md text-on-surface border-b border-outline-variant pb-3">
-              <span>Service Fee:</span>
-              <span class="font-code-mono whitespace-nowrap">Rp ${p.serviceFee.toLocaleString('id-ID')}</span>
-            </div>` : '<div class="border-b border-outline-variant pb-1"></div>'}
-            <div class="flex justify-between items-center pt-2">
-              <span class="font-headline-sm font-bold text-secondary">Total Due:</span>
-              <span class="font-headline-md font-bold text-secondary font-code-mono whitespace-nowrap">Rp ${p.total.toLocaleString('id-ID')}</span>
+            ${p.serviceFee > 0 ? `
+            <div class="total-row flex justify-between text-gray-700">
+              <span>Service Fee</span>
+              <span class="amount font-mono whitespace-nowrap">Rp ${p.serviceFee.toLocaleString('id-ID')}</span>
+            </div>` : ''}
+            <hr class="total-divider border-gray-300 my-2">
+            <div class="total-row grand-total flex justify-between items-center pt-1">
+              <span class="label text-lg font-extrabold text-primary">Total Due</span>
+              <span class="amount text-xl font-extrabold text-primary font-mono whitespace-nowrap">Rp ${p.total.toLocaleString('id-ID')}</span>
             </div>
               `;
             })()}
           </div>
         </div>
 
-        <!-- Instructions -->
-        <div class="flex flex-col text-on-surface-variant font-body-md text-sm print:text-xs border-t border-outline-variant pt-6 print:pt-4 break-inside-avoid">
-          <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 print:gap-4">
-            <div>
-              <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Terms &amp; Conditions</h4>
-              <p>Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number (no email will be sent) at the main entrance gate.</p>
-            </div>
-            <div>
-              <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Payment Instructions</h4>
-              <p class="mb-2"><strong>Transfer to:</strong><br>
-              Bank name: Bank Jago<br>
-              Account number: 103494729785<br>
-              Account name: Ida Ayu Gede Anindyatari<br>
-              Swift code: JAGBIDJA</p>
-              
-              <p class="mb-2"><strong>Payment can also be paid to PayPal:</strong><br>
-              Send payment to: arcomteknologi@gmail.com</p>
-              
-              <p class="font-semibold text-primary mt-2">Please send proof of transfer to confirm your booking.</p>
-            </div>
+        <!-- FOOTER INFO: Terms + Payment -->
+        <div class="inv-footer-info grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-200 pt-6">
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Terms &amp; Conditions</h4>
+            <p class="text-xs text-gray-500 leading-relaxed">Vouchers are non-refundable but can be rescheduled up to 24 hours before the reservation date. Please present the QR code sent to your WhatsApp number at the main entrance gate.</p>
+          </div>
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Payment Instructions</h4>
+            <p class="text-xs text-gray-500 leading-relaxed mb-2">
+              <strong class="text-gray-700">Bank Transfer:</strong><br>
+              Bank Jago — 103494729785<br>
+              a.n. Ida Ayu Gede Anindyatari<br>
+              Swift: JAGBIDJA
+            </p>
+            <p class="text-xs text-gray-500 leading-relaxed mb-2">
+              <strong class="text-gray-700">PayPal:</strong> arcomteknologi@gmail.com
+            </p>
+            <p class="proof-note text-xs font-semibold text-primary">Please send proof of payment to confirm your booking.</p>
           </div>
         </div>
 
-        <!-- Footer area of invoice -->
-        <div class="bg-surface-container px-8 py-6 print:py-4 text-center border-t border-outline-variant mt-8 print:mt-4 -mx-8 -mb-8 md:-mx-10 md:-mb-10">
-          <p class="font-body-md text-on-surface-variant">Thank you for visiting ${appSettings.merchant_name || 'Batur Natural Hot Spring'}!</p>
+        <!-- BOTTOM BAR -->
+        <div class="inv-bottom-bar bg-gray-50 text-center border-t border-gray-100 mt-8 -mx-8 -mb-8 md:-mx-10 md:-mb-10 py-4 px-6 rounded-b-xl">
+          <p class="text-sm text-gray-400">Thank you for visiting <strong class="text-gray-600">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</strong> — We look forward to welcoming you!</p>
         </div>
       </div>
     `;
