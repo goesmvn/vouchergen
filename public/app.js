@@ -58,7 +58,23 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAuth();
 });
 
-// Auth Check
+// Helper to show/hide loading overlay
+function showLoading(show = true, title = 'Saving...', desc = 'Processing your request, please wait.') {
+  const overlay = document.getElementById('loading-overlay');
+  const titleEl = document.getElementById('loading-title');
+  const descEl = document.getElementById('loading-desc');
+  if (!overlay) return;
+  
+  if (show) {
+    if (titleEl) titleEl.innerText = title;
+    if (descEl) descEl.innerText = desc;
+    overlay.classList.remove('hidden');
+  } else {
+    overlay.classList.add('hidden');
+  }
+}
+
+// Check Auth
 function checkAuth() {
   const loginSection = document.getElementById('login-section');
   const dashboardSection = document.getElementById('dashboard-section');
@@ -201,6 +217,7 @@ function setupEventListeners() {
     const is_active = parseInt(document.getElementById('store-ticket-status').value);
 
     try {
+      showLoading(true, 'Creating...', 'Saving new ticket category...');
       const response = await fetch('/api/tickets', {
         method: 'POST',
         headers: {
@@ -220,6 +237,8 @@ function setupEventListeners() {
       renderBookingCatalog();
     } catch (err) {
       showToast(err.message, true);
+    } finally {
+      showLoading(false);
     }
   });
 
@@ -236,6 +255,7 @@ function setupEventListeners() {
     const is_active = parseInt(document.getElementById('edit-ticket-status').value);
 
     try {
+      showLoading(true, 'Updating...', 'Saving ticket changes...');
       const response = await fetch(`/api/tickets/${id}`, {
         method: 'PUT',
         headers: {
@@ -255,6 +275,8 @@ function setupEventListeners() {
       renderBookingCatalog();
     } catch (err) {
       showToast(err.message, true);
+    } finally {
+      showLoading(false);
     }
   });
 
@@ -296,6 +318,7 @@ function setupEventListeners() {
       };
 
       try {
+        showLoading(true, 'Saving Settings...', 'Updating system configurations...');
         const response = await fetch('/api/settings', {
           method: 'PUT',
           headers: {
@@ -312,6 +335,8 @@ function setupEventListeners() {
         await loadSettings();
       } catch (err) {
         showToast(err.message, true);
+      } finally {
+        showLoading(false);
       }
     });
   }
@@ -366,6 +391,7 @@ function setupEventListeners() {
       const method = id ? 'PUT' : 'POST';
 
       try {
+        showLoading(true, id ? 'Updating...' : 'Creating...', 'Saving payment method...');
         const response = await fetch(url, {
           method,
           headers: {
@@ -383,6 +409,8 @@ function setupEventListeners() {
         await loadPaymentMethods();
       } catch (err) {
         showToast(err.message, true);
+      } finally {
+        showLoading(false);
       }
     });
   }
@@ -1157,7 +1185,7 @@ function updateBookingTotal() {
   const itemsEl = document.getElementById('checkout-items-list');
   if (itemsEl) {
     if (selectedItems.length === 0) {
-      itemsEl.innerHTML = '<p class="text-xs text-on-surface-variant italic">Belum ada tiket dipilih.</p>';
+      itemsEl.innerHTML = '<p class="text-xs text-on-surface-variant italic">No tickets selected.</p>';
     } else {
       itemsEl.innerHTML = selectedItems.map(({ ticket, qty }) => `
         <div class="flex justify-between items-center py-1.5 border-b border-outline-variant last:border-0">
@@ -1405,7 +1433,7 @@ async function processBookingSubmit(payDirectly = false) {
   const paymentMethod = document.getElementById('booking-payment-method').value;
   
   if (!customerName) {
-    showToast('Harap masukkan nama lengkap pengunjung!', true);
+    showToast('Please enter the customer name!', true);
     return;
   }
 
@@ -1421,12 +1449,13 @@ async function processBookingSubmit(payDirectly = false) {
   });
 
   if (orderItems.length === 0) {
-    showToast('Harap pilih minimal 1 tiket pengunjung!', true);
+    showToast('Please select at least 1 ticket!', true);
     return;
   }
 
   try {
     closeBookingConfirm();
+    showLoading(true, payDirectly ? 'Processing Payment...' : 'Creating Invoice...', 'Submitting booking details...');
 
     const response = await fetch('/api/invoices', {
       method: 'POST',
@@ -1450,13 +1479,15 @@ async function processBookingSubmit(payDirectly = false) {
       });
     }
 
-    showToast(payDirectly ? 'Pembayaran berhasil dikonfirmasi!' : 'Invoice berhasil dibuat!');
+    showToast(payDirectly ? 'Payment successfully confirmed!' : 'Invoice created successfully!');
     resetBookingFlow();
     await loadInvoices();
     openInvoiceDetails(data.id);
 
   } catch (err) {
     showToast(err.message, true);
+  } finally {
+    showLoading(false);
   }
 }
 
@@ -2010,7 +2041,7 @@ async function openVoucherModal(code) {
             <!-- Visit date banner -->
             <div class="mx-5 mb-4 py-3 px-4 rounded-xl flex items-center justify-between" style="background:linear-gradient(135deg,#1a3d2b,#2d6a4f)">
               <div>
-                <div class="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Tanggal Kunjungan</div>
+                <div class="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Visit Date</div>
                 <div class="text-white font-extrabold text-sm mt-0.5">${visitLabel}</div>
               </div>
               <span class="material-symbols-outlined text-emerald-300" style="font-size:28px;font-variation-settings:'FILL' 1">calendar_month</span>
@@ -2050,8 +2081,8 @@ async function openVoucherModal(code) {
                 </div>
               </div>
               <!-- Row 2: Ticket type BIG -->
-              <div class="px-5 py-4 border-b border-dashed border-emerald-200">
-                <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Jenis Tiket</div>
+              <div class="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-dashed border-emerald-200">
+                <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Ticket Type</div>
                 <div class="space-y-1">
                   <div class="text-base font-extrabold text-gray-900 leading-tight">${item.ticket_title} <span class="text-emerald-700 font-black">(x${item.quantity})</span></div>
                 </div>
@@ -2059,7 +2090,7 @@ async function openVoucherModal(code) {
               <!-- Row 3: 3-col info -->
               <div class="grid grid-cols-3 border-b border-dashed border-emerald-200">
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200">
-                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Nama</div>
+                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Name</div>
                   <div class="text-sm font-extrabold text-gray-900 leading-tight">${data.customer_name}</div>
                 </div>
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center justify-center">
@@ -2075,7 +2106,7 @@ async function openVoucherModal(code) {
               <!-- Row 4: BIG DATE + small QR side by side -->
               <div class="flex items-stretch">
                 <div class="flex-1 px-5 py-5" style="background:linear-gradient(135deg,#1a3d2b 0%,#2d6a4f 100%)">
-                  <div class="text-[9px] uppercase tracking-[3px] text-emerald-300 font-bold mb-2">📅 Tanggal Kunjungan</div>
+                  <div class="text-[9px] uppercase tracking-[3px] text-emerald-300 font-bold mb-2">📅 Visit Date</div>
                   <div class="text-white font-black text-xl leading-tight">${visitLabel}</div>
                   <div class="mt-3 font-mono text-emerald-300 text-[10px] tracking-wider">${renderItem.itemVoucherCode}</div>
                 </div>
@@ -2106,7 +2137,7 @@ async function openVoucherModal(code) {
             </div>
             <!-- Big Ticket Name -->
             <div class="px-5 pt-5 pb-2">
-              <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Jenis Tiket</div>
+              <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Ticket Type</div>
               <div class="space-y-1">
                 <div class="text-base font-extrabold text-white leading-tight">${item.ticket_title} <span style="color:#52b788">(x${item.quantity})</span></div>
               </div>
@@ -2114,7 +2145,7 @@ async function openVoucherModal(code) {
             <!-- Name + Pax -->
             <div class="px-5 pb-4 flex items-end gap-4">
               <div class="flex-1">
-                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Nama Pengunjung</div>
+                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Customer Name</div>
                 <div class="text-base font-extrabold text-white">${data.customer_name}</div>
               </div>
               <div class="text-right">
@@ -2126,7 +2157,7 @@ async function openVoucherModal(code) {
             <div class="mx-4 mb-4 rounded-xl px-4 py-3 flex items-center gap-3" style="background:#1a3d2b;border:1px solid #2d6a4f">
               <span class="material-symbols-outlined" style="color:#52b788;font-size:32px;font-variation-settings:'FILL' 1">event_available</span>
               <div>
-                <div class="text-[8px] uppercase tracking-widest text-emerald-500 font-bold">Tanggal Kunjungan</div>
+                <div class="text-[8px] uppercase tracking-widest text-emerald-500 font-bold">Visit Date</div>
                 <div class="text-white font-extrabold text-sm">${visitLabel}</div>
               </div>
             </div>
@@ -2142,7 +2173,7 @@ async function openVoucherModal(code) {
               </div>
             </div>
             <!-- Footer -->
-            <div class="border-t px-5 py-2.5 flex items-center justify-between" style="border-color:#1f3329">
+            <div class="border-t border-color:#1f3329 px-5 py-2.5 flex items-center justify-between" style="border-color:#1f3329">
               <p class="text-[8px] text-emerald-600 uppercase tracking-widest">Non-transferable</p>
               ${website ? `<p class="text-[8px] text-emerald-600 font-semibold">${website}</p>` : ''}
             </div>
@@ -2310,7 +2341,7 @@ async function downloadVoucherPDF(codes) {
             </div>
             <div class="mx-5 mb-4 py-3 px-4 rounded-xl flex items-center justify-between" style="background:linear-gradient(135deg,#1a3d2b,#2d6a4f)">
               <div>
-                <div class="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Tanggal Kunjungan</div>
+                <div class="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Visit Date</div>
                 <div class="text-white font-extrabold text-sm mt-0.5">${visitLabel}</div>
               </div>
               <span class="material-symbols-outlined text-emerald-300" style="font-size:28px;font-variation-settings:'FILL' 1">calendar_month</span>
@@ -2346,14 +2377,14 @@ async function downloadVoucherPDF(codes) {
                 </div>
               </div>
               <div class="px-5 py-4 border-b border-dashed border-emerald-200">
-                <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Jenis Tiket</div>
+                <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Ticket Type</div>
                 <div class="space-y-1">
                   <div class="text-base font-extrabold text-gray-900 leading-tight">${item.ticket_title} <span class="text-emerald-700 font-black">(x${item.quantity})</span></div>
                 </div>
               </div>
               <div class="grid grid-cols-3 border-b border-dashed border-emerald-200">
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200">
-                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Nama</div>
+                  <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Name</div>
                   <div class="text-sm font-extrabold text-gray-900 leading-tight">${data.customer_name}</div>
                 </div>
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center justify-center">
@@ -2368,7 +2399,7 @@ async function downloadVoucherPDF(codes) {
               </div>
               <div class="flex items-stretch">
                 <div class="flex-1 px-5 py-5" style="background:linear-gradient(135deg,#1a3d2b 0%,#2d6a4f 100%)">
-                  <div class="text-[9px] uppercase tracking-[3px] text-emerald-300 font-bold mb-2">📅 Tanggal Kunjungan</div>
+                  <div class="text-[9px] uppercase tracking-[3px] text-emerald-300 font-bold mb-2">📅 Visit Date</div>
                   <div class="text-white font-black text-xl leading-tight">${visitLabel}</div>
                   <div class="mt-3 font-mono text-emerald-300 text-[10px] tracking-wider">${renderItem.itemVoucherCode}</div>
                 </div>
@@ -2396,14 +2427,14 @@ async function downloadVoucherPDF(codes) {
               <span class="badge ${badgeClass} text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">${statusBadge}</span>
             </div>
             <div class="px-5 pt-5 pb-2">
-              <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Jenis Tiket</div>
+              <div class="text-[9px] uppercase tracking-[3px] text-emerald-500 font-bold mb-2">Ticket Type</div>
               <div class="space-y-1">
                 <div class="text-base font-extrabold text-white leading-tight">${item.ticket_title} <span style="color:#52b788">(x${item.quantity})</span></div>
               </div>
             </div>
             <div class="px-5 pb-4 flex items-end gap-4">
               <div class="flex-1">
-                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Nama Pengunjung</div>
+                <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Customer Name</div>
                 <div class="text-base font-extrabold text-white">${data.customer_name}</div>
               </div>
               <div class="text-right">
@@ -2414,7 +2445,7 @@ async function downloadVoucherPDF(codes) {
             <div class="mx-4 mb-4 rounded-xl px-4 py-3 flex items-center gap-3" style="background:#1a3d2b;border:1px solid #2d6a4f">
               <span class="material-symbols-outlined" style="color:#52b788;font-size:32px;font-variation-settings:'FILL' 1">event_available</span>
               <div>
-                <div class="text-[8px] uppercase tracking-widest text-emerald-500 font-bold">Tanggal Kunjungan</div>
+                <div class="text-[8px] uppercase tracking-widest text-emerald-500 font-bold">Visit Date</div>
                 <div class="text-white font-extrabold text-sm">${visitLabel}</div>
               </div>
             </div>
@@ -2763,8 +2794,9 @@ async function startWhatsAppBot() {
 }
 
 async function logoutWhatsAppBot() {
-  if (!confirm('Apakah Anda yakin ingin memutuskan dan mengeluarkan WhatsApp Bot?')) return;
+  if (!confirm('Are you sure you want to disconnect and log out the WhatsApp Bot?')) return;
   try {
+    showLoading(true, 'Disconnecting...', 'Logging out WhatsApp session...');
     const response = await fetch('/api/whatsapp/logout', {
       method: 'POST',
       headers: { 'Authorization': token }
@@ -2775,6 +2807,8 @@ async function logoutWhatsAppBot() {
     pollWhatsAppStatus();
   } catch (err) {
     showToast(err.message, true);
+  } finally {
+    showLoading(false);
   }
 }
 
@@ -2788,7 +2822,7 @@ async function loadWhatsAppLogs() {
 
     const container = document.getElementById('whatsapp-logs-container');
     if (data.length === 0) {
-      container.innerHTML = '<p class="text-secondary text-center text-xs py-8">Belum ada aktivitas obrolan.</p>';
+      container.innerHTML = '<p class="text-secondary text-center text-xs py-8">No chat activities yet.</p>';
       return;
     }
 
@@ -2802,11 +2836,11 @@ async function loadWhatsAppLogs() {
           <span>🕒 ${log.timestamp}</span>
         </div>
         <div class="bg-surface-container p-2 rounded text-on-surface">
-          <span class="font-bold text-[10px] block text-secondary uppercase">Pesan Masuk:</span>
+          <span class="font-bold text-[10px] block text-secondary uppercase">Incoming Message:</span>
           <p class="mt-0.5">${log.message}</p>
         </div>
         <div class="bg-primary-container/10 p-2 rounded text-primary border-l-2 border-primary">
-          <span class="font-bold text-[10px] block text-primary uppercase">Balasan Otomatis:</span>
+          <span class="font-bold text-[10px] block text-primary uppercase">Auto Reply:</span>
           <p class="mt-0.5 whitespace-pre-wrap">${log.reply}</p>
         </div>
       `;
@@ -2920,7 +2954,7 @@ function populateGeneratorPayments() {
 
 async function backupDatabase() {
   try {
-    showToast('Menyiapkan file backup...', false);
+    showLoading(true, 'Backing up...', 'Preparing database copy...');
     const response = await fetch('/api/admin/database/backup', {
       headers: { 'Authorization': token }
     });
@@ -2938,24 +2972,26 @@ async function backupDatabase() {
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
-    showToast('Backup berhasil diunduh!');
+    showToast('Backup downloaded successfully!');
   } catch (err) {
     showToast(err.message, true);
+  } finally {
+    showLoading(false);
   }
 }
 
 async function resetDatabase() {
-  const confirmed = confirm('PERINGATAN KERAS!\n\nTindakan ini akan menghapus SELURUH data invoice, data redemption (scan tiket), dan log WhatsApp.\n\nApakah Anda yakin ingin melanjutkan reset database?');
+  const confirmed = confirm('CRITICAL WARNING!\n\nThis action will delete ALL invoice, ticket redemption, and WhatsApp log data.\n\nAre you sure you want to proceed?');
   if (!confirmed) return;
   
-  const doubleConfirmed = prompt('Ketik "RESET" untuk mengonfirmasi tindakan ini:');
+  const doubleConfirmed = prompt('Type "RESET" to confirm this action:');
   if (doubleConfirmed !== 'RESET') {
-    showToast('Reset dibatalkan.', true);
+    showToast('Reset cancelled.', true);
     return;
   }
 
   try {
-    showToast('Mereset database...', false);
+    showLoading(true, 'Resetting...', 'Wiping database data...');
     const response = await fetch('/api/admin/database/reset', {
       method: 'POST',
       headers: {
@@ -2965,10 +3001,12 @@ async function resetDatabase() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Reset failed');
-    showToast('Database berhasil direset!');
+    showToast('Database wiped successfully!');
     setTimeout(() => window.location.reload(), 1500);
   } catch (err) {
     showToast(err.message, true);
+  } finally {
+    showLoading(false);
   }
 }
 
@@ -2976,7 +3014,7 @@ async function handleRestoreFileSelected(input) {
   const file = input.files[0];
   if (!file) return;
 
-  const confirmed = confirm(`Apakah Anda yakin ingin memulihkan database menggunakan file "${file.name}"?\n\nDatabase saat ini akan ditimpa seluruhnya.`);
+  const confirmed = confirm(`Are you sure you want to restore the database using "${file.name}"?\n\nThe current database will be completely overwritten.`);
   if (!confirmed) {
     input.value = '';
     return;
@@ -2986,7 +3024,7 @@ async function handleRestoreFileSelected(input) {
   formData.append('backup', file);
 
   try {
-    showToast('Memulihkan database (sedang upload)...', false);
+    showLoading(true, 'Restoring...', 'Uploading and applying database backup...');
     const response = await fetch('/api/admin/database/restore', {
       method: 'POST',
       headers: {
@@ -2996,10 +3034,12 @@ async function handleRestoreFileSelected(input) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Restore failed');
-    showToast('Database berhasil dipulihkan!');
+    showToast('Database restored successfully!');
     setTimeout(() => window.location.reload(), 1500);
   } catch (err) {
     showToast(err.message, true);
     input.value = '';
+  } finally {
+    showLoading(false);
   }
 }

@@ -1986,6 +1986,21 @@
     </div>
   </div>
 
+  <!-- LOADING OVERLAY -->
+  <div id="loading-overlay" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-on-background/60 backdrop-blur-sm hidden no-print">
+    <div class="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant shadow-2xl flex flex-col items-center space-y-4 max-w-xs mx-4 text-center">
+      <!-- M3 style spinner -->
+      <div class="relative w-12 h-12">
+        <div class="absolute inset-0 rounded-full border-4 border-outline-variant/30"></div>
+        <div class="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+      </div>
+      <div class="space-y-1.5">
+        <h4 id="loading-title" class="font-bold text-sm text-on-surface">Saving...</h4>
+        <p id="loading-desc" class="text-xs text-on-surface-variant leading-relaxed">Processing your request, please wait.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Notification Banner -->
   <div id="toast-notification" class="toast hidden"></div>
 
