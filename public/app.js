@@ -193,8 +193,10 @@ function setupEventListeners() {
   document.getElementById('store-ticket-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = document.getElementById('store-ticket-title').value;
-    const price = parseFloat(document.getElementById('store-ticket-price').value);
-    const discount = parseFloat(document.getElementById('store-ticket-discount')?.value) || 0;
+    const rawPrice = document.getElementById('store-ticket-price').value.replace(/\./g, '');
+    const price = parseFloat(rawPrice);
+    const rawDiscount = document.getElementById('store-ticket-discount')?.value.replace(/\./g, '') || '0';
+    const discount = parseFloat(rawDiscount) || 0;
     const description = document.getElementById('store-ticket-desc').value;
     const is_active = parseInt(document.getElementById('store-ticket-status').value);
 
@@ -226,8 +228,10 @@ function setupEventListeners() {
     e.preventDefault();
     const id = document.getElementById('edit-ticket-id').value;
     const title = document.getElementById('edit-ticket-title').value;
-    const price = parseFloat(document.getElementById('edit-ticket-price').value);
-    const discount = parseFloat(document.getElementById('edit-ticket-discount')?.value) || 0;
+    const rawPrice = document.getElementById('edit-ticket-price').value.replace(/\./g, '');
+    const price = parseFloat(rawPrice);
+    const rawDiscount = document.getElementById('edit-ticket-discount')?.value.replace(/\./g, '') || '0';
+    const discount = parseFloat(rawDiscount) || 0;
     const description = document.getElementById('edit-ticket-desc').value;
     const is_active = parseInt(document.getElementById('edit-ticket-status').value);
 
@@ -836,6 +840,7 @@ async function confirmPayment(invoiceId) {
     showToast('Payment verified. Voucher issued.');
     await loadInvoices();
     if (currentTab === 'orders') renderOrdersTable();
+    if (currentTab === 'invoices') renderInvoicesTable();
     if (currentTab === 'dashboard') renderDashboardStats();
   } catch (err) {
     showToast(err.message, true);
@@ -913,9 +918,17 @@ function renderStoreTicketsTable() {
 function editStoreTicket(id, title, price, discount, description, is_active) {
   document.getElementById('edit-ticket-id').value = id;
   document.getElementById('edit-ticket-title').value = title;
-  document.getElementById('edit-ticket-price').value = price;
+  
+  const priceEl = document.getElementById('edit-ticket-price');
+  priceEl.value = price;
+  formatNumberInput(priceEl);
+  
   const discEl = document.getElementById('edit-ticket-discount');
-  if (discEl) discEl.value = discount || 0;
+  if (discEl) {
+    discEl.value = discount || 0;
+    formatNumberInput(discEl);
+  }
+  
   document.getElementById('edit-ticket-desc').value = description;
   document.getElementById('edit-ticket-status').value = is_active;
   
@@ -2462,6 +2475,16 @@ async function downloadVoucherPDF(codes) {
     const tempContainer = document.querySelector('div[style*="left: -9999px"]');
     if (tempContainer) document.body.removeChild(tempContainer);
   }
+}
+
+// Helper to format number input value with thousands dots
+function formatNumberInput(input) {
+  let val = input.value.replace(/\D/g, '');
+  if (!val) {
+    input.value = '';
+    return;
+  }
+  input.value = parseInt(val).toLocaleString('id-ID');
 }
 
 // Helper to confirm payment from inside the detail modal

@@ -180,7 +180,7 @@
         max-width: 100% !important;
       }
 
-      .modal {
+      .modal.fixed {
         position: static !important;
         top: auto !important;
         left: auto !important;
@@ -1038,11 +1038,11 @@
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label for="store-ticket-price" class="text-xs font-bold uppercase text-on-surface-variant">Harga (Rp)</label>
-                  <input type="number" id="store-ticket-price" placeholder="e.g. 70000" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+                  <input type="text" id="store-ticket-price" placeholder="e.g. 70.000" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary" oninput="formatNumberInput(this)">
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label for="store-ticket-discount" class="text-xs font-bold uppercase text-on-surface-variant">Diskon per Item (Rp)</label>
-                  <input type="number" id="store-ticket-discount" placeholder="e.g. 10000" value="0" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+                  <input type="text" id="store-ticket-discount" placeholder="e.g. 10.000" value="0" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary" oninput="formatNumberInput(this)">
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label for="store-ticket-desc" class="text-xs font-bold uppercase text-on-surface-variant">Deskripsi</label>
@@ -1942,7 +1942,7 @@
   </div>
 
   <!-- EDIT TICKET MODAL -->
-  <div id="edit-ticket-modal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+  <div id="edit-ticket-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
     <div class="modal-overlay absolute inset-0 bg-on-background/40 backdrop-blur-sm" onclick="closeEditTicketModal()"></div>
     <div class="modal-content relative z-10 w-full max-w-md p-6 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg no-print">
       <button class="modal-close-btn absolute top-4 right-4" onclick="closeEditTicketModal()">✕</button>
@@ -1957,11 +1957,11 @@
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="edit-ticket-price" class="text-xs font-bold uppercase text-on-surface-variant">Harga (Rp)</label>
-          <input type="number" id="edit-ticket-price" placeholder="e.g. 70000" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+          <input type="text" id="edit-ticket-price" placeholder="e.g. 70.000" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary" oninput="formatNumberInput(this)">
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="edit-ticket-discount" class="text-xs font-bold uppercase text-on-surface-variant">Diskon per Item (Rp)</label>
-          <input type="number" id="edit-ticket-discount" placeholder="e.g. 10000" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
+          <input type="text" id="edit-ticket-discount" placeholder="e.g. 10.000" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary" oninput="formatNumberInput(this)">
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="edit-ticket-desc" class="text-xs font-bold uppercase text-on-surface-variant">Deskripsi</label>
