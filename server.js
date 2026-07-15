@@ -194,6 +194,7 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS payment_methods (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
+        instructions TEXT DEFAULT '',
         is_active INTEGER DEFAULT 1
       )
     `);
@@ -201,10 +202,10 @@ async function initializeDatabase() {
     // Seed default payment methods if empty
     const pms = await dbAll('SELECT * FROM payment_methods');
     if (pms.length === 0) {
-      await dbRun('INSERT INTO payment_methods (name, is_active) VALUES (?, 1)', ['Tunai']);
-      await dbRun('INSERT INTO payment_methods (name, is_active) VALUES (?, 1)', ['Transfer Bank']);
-      await dbRun('INSERT INTO payment_methods (name, is_active) VALUES (?, 1)', ['QRIS']);
-      await dbRun('INSERT INTO payment_methods (name, is_active) VALUES (?, 1)', ['Debit Card']);
+      await dbRun('INSERT INTO payment_methods (name, instructions, is_active) VALUES (?, ?, 1)', ['Tunai', 'Pembayaran langsung secara tunai di kasir/front office saat kedatangan.']);
+      await dbRun('INSERT INTO payment_methods (name, instructions, is_active) VALUES (?, ?, 1)', ['Transfer Bank', 'Silakan lakukan transfer ke:\nBank name: Bank Jago\nAccount number: 103494729785\nAccount name: Ida Ayu Gede Anindyatari\nSwift code: JAGBIDJA\n\nHarap kirimkan bukti transfer untuk konfirmasi.']);
+      await dbRun('INSERT INTO payment_methods (name, instructions, is_active) VALUES (?, ?, 1)', ['QRIS', 'Silakan scan QRIS resmi merchant yang tersedia di kasir atau tanyakan ke petugas kami untuk penyediaan barcode.']);
+      await dbRun('INSERT INTO payment_methods (name, instructions, is_active) VALUES (?, ?, 1)', ['Debit Card', 'Gunakan kartu debit Anda langsung di mesin EDC kasir saat kedatangan.']);
       console.log('Seeded initial payment methods.');
     }
 
@@ -326,9 +327,11 @@ app.get('/api/invoices', async (req, res) => {
   try {
     const query = `
       SELECT invoices.*,
-      CASE WHEN redemptions.voucher_code IS NOT NULL THEN 'Redeemed' ELSE invoices.status END as current_status
+      CASE WHEN redemptions.voucher_code IS NOT NULL THEN 'Redeemed' ELSE invoices.status END as current_status,
+      payment_methods.instructions as payment_instructions
       FROM invoices 
       LEFT JOIN redemptions ON invoices.voucher_code = redemptions.voucher_code
+      LEFT JOIN payment_methods ON invoices.payment_method = payment_methods.name
       ORDER BY invoices.id DESC
     `;
     const rows = await dbAll(query);
@@ -615,21 +618,21 @@ app.get('/api/payment-methods', async (req, res) => {
 });
 
 app.post('/api/payment-methods', authenticateToken, async (req, res) => {
-  const { name } = req.body;
+  const { name, instructions } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
   try {
-    const result = await dbRun('INSERT INTO payment_methods (name, is_active) VALUES (?, 1)', [name]);
-    res.status(201).json({ id: result.lastID, name, is_active: 1 });
+    const result = await dbRun('INSERT INTO payment_methods (name, instructions, is_active) VALUES (?, ?, 1)', [name, instructions || '']);
+    res.status(201).json({ id: result.lastID, name, instructions: instructions || '', is_active: 1 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.put('/api/payment-methods/:id', authenticateToken, async (req, res) => {
-  const { name, is_active } = req.body;
+  const { name, instructions, is_active } = req.body;
   try {
-    await dbRun('UPDATE payment_methods SET name = ?, is_active = ? WHERE id = ?', [name, is_active, req.params.id]);
-    res.json({ id: req.params.id, name, is_active });
+    await dbRun('UPDATE payment_methods SET name = ?, instructions = ?, is_active = ? WHERE id = ?', [name, instructions || '', is_active, req.params.id]);
+    res.json({ id: req.params.id, name, instructions, is_active });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

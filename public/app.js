@@ -359,6 +359,7 @@ function setupEventListeners() {
       e.preventDefault();
       const id = document.getElementById('store-pm-edit-id').value;
       const name = document.getElementById('store-pm-name').value.trim();
+      const instructions = document.getElementById('store-pm-instructions').value.trim();
       const is_active = parseInt(document.getElementById('store-pm-status').value);
 
       const url = id ? `/api/payment-methods/${id}` : '/api/payment-methods';
@@ -371,7 +372,7 @@ function setupEventListeners() {
             'Content-Type': 'application/json',
             'Authorization': token
           },
-          body: JSON.stringify({ name, is_active })
+          body: JSON.stringify({ name, instructions, is_active })
         });
 
         const data = await response.json();
@@ -1653,7 +1654,7 @@ async function openMultiInvoiceDetails(invoiceIds) {
             </div>
             <div>
               <h4 class="font-semibold text-on-surface mb-2 print:mb-1">Payment Instructions</h4>
-              <p class="whitespace-pre-wrap">${appSettings.merchant_payment_instructions || 'Please complete transfer.'}</p>
+              <p class="whitespace-pre-wrap">${first.payment_instructions || appSettings.merchant_payment_instructions || 'Please complete transfer.'}</p>
             </div>
           </div>
         </div>
@@ -1830,7 +1831,7 @@ async function openInvoiceDetails(invoiceId) {
           </div>
           <div>
             <h4 class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Payment Instructions</h4>
-            <p class="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">${appSettings.merchant_payment_instructions || 'Please complete bank transfer to complete booking.'}</p>
+            <p class="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">${inv.payment_instructions || appSettings.merchant_payment_instructions || 'Please complete bank transfer to complete booking.'}</p>
           </div>
         </div>
 
@@ -2851,7 +2852,7 @@ function renderStorePMTable() {
         </span>
       </td>
       <td class="py-3 px-4 text-sm space-x-2">
-        <button class="bg-primary/5 text-primary hover:bg-primary hover:text-white px-3 py-1 rounded transition-all text-xs font-semibold" onclick="editStorePM(${pm.id}, '${pm.name}', ${pm.is_active})">Edit</button>
+        <button class="bg-primary/5 text-primary hover:bg-primary hover:text-white px-3 py-1 rounded transition-all text-xs font-semibold" onclick="editStorePM(${pm.id}, '${pm.name}', ${pm.is_active}, '${(pm.instructions || '').replace(/'/g, "\\'")}')">Edit</button>
         <button class="bg-error/5 text-error hover:bg-error hover:text-white px-3 py-1 rounded transition-all text-xs font-semibold" onclick="deleteStorePM(${pm.id})">Hapus</button>
       </td>
     `;
@@ -2862,15 +2863,17 @@ function renderStorePMTable() {
 function resetStorePMForm() {
   document.getElementById('store-pm-edit-id').value = '';
   document.getElementById('store-pm-name').value = '';
+  document.getElementById('store-pm-instructions').value = '';
   document.getElementById('store-pm-status').value = '1';
   document.getElementById('store-pm-form-title').innerText = 'Tambah Metode Pembayaran';
   const cancelBtn = document.getElementById('btn-store-cancel-pm-edit');
   if (cancelBtn) cancelBtn.classList.add('hidden');
 }
 
-function editStorePM(id, name, isActive) {
+function editStorePM(id, name, isActive, instructions) {
   document.getElementById('store-pm-edit-id').value = id;
   document.getElementById('store-pm-name').value = name;
+  document.getElementById('store-pm-instructions').value = instructions || '';
   document.getElementById('store-pm-status').value = isActive ? '1' : '0';
   document.getElementById('store-pm-form-title').innerText = 'Edit Metode Pembayaran';
   const cancelBtn = document.getElementById('btn-store-cancel-pm-edit');
