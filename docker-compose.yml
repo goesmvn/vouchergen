@@ -25,8 +25,7 @@ services:
       - "5001:5000"
     environment:
       - DB_PATH=/data/database.sqlite
-    volumes:
-      - voucher-data:/data
+      - GENERATOR_URL=http://voucher-generator:3000
     networks:
       - default
 

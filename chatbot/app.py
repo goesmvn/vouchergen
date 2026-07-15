@@ -10,93 +10,162 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Resolve SQLite database path
+# Resolve SQLite database path (Dummy since we use HTTP API to prevent locking)
 def get_db_path():
-    db_path = os.environ.get('DB_PATH')
-    if db_path:
-        return db_path
-    # Local fallbacks
-    if os.path.exists('database.sqlite'):
-        return 'database.sqlite'
-    elif os.path.exists('../database.sqlite'):
-        return '../database.sqlite'
     return 'database.sqlite'
 
-# Initialize Logs Table
+# Initialize Logs Table (Dummy since generator handles SQLite schema)
 def init_db():
-    path = get_db_path()
-    conn = sqlite3.connect(path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS whatsapp_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone TEXT,
-            message TEXT,
-            reply TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chatbot_sessions (
-            phone TEXT PRIMARY KEY,
-            step INTEGER DEFAULT 0,
-            timestamp REAL,
-            name TEXT,
-            ticket_id INTEGER,
-            quantity INTEGER,
-            payment_method TEXT,
-            bot_mode TEXT DEFAULT 'bot',
-            ticket_status TEXT DEFAULT 'closed',
-            ticket_subject TEXT,
-            lang TEXT DEFAULT 'id'
-        )
-    """)
-    try:
-        cursor.execute("ALTER TABLE chatbot_sessions ADD COLUMN lang TEXT DEFAULT 'id'")
-    except sqlite3.OperationalError:
-        pass
-    conn.commit()
-    conn.close()
+    pass
 
-init_db()
+GENERATOR_URL = os.environ.get('GENERATOR_URL', 'http://voucher-generator:3000')
 
-# DB Helpers
+# DB Helpers over HTTP API (Single Writer Pattern)
 def db_get(query, params=()):
-    conn = sqlite3.connect(get_db_path())
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    row = cursor.fetchone()
-    conn.close()
-    return dict(row) if row else None
+    query_lower = query.lower()
+    if "settings" in query_lower:
+        try:
+            r = requests.get(f"{GENERATOR_URL}/api/internal/settings", timeout=5)
+            if r.status_code == 200:
+                rows = r.json() # list of {key, value}
+                if "waha_url" in query_lower:
+                    for row in rows:
+                        if row.get('key') == 'waha_url':
+                            return row
+                for row in rows:
+                    if len(params) > 0 and row.get('key') == params[0]:
+                        return row
+        except Exception as e:
+            print(f"Error fetching settings from generator: {e}")
+    elif "chatbot_sessions" in query_lower:
+        phone = params[0]
+        try:
+            r = requests.get(f"{GENERATOR_URL}/api/internal/session/{phone}", timeout=5)
+            if r.status_code == 200:
+                return r.json()
+        except Exception as e:
+            print(f"Error fetching session {phone} from generator: {e}")
+    elif "tickets" in query_lower:
+        ticket_id = params[0]
+        try:
+            r = requests.get(f"{GENERATOR_URL}/api/internal/tickets", timeout=5)
+            if r.status_code == 200:
+                tickets = r.json()
+                for t in tickets:
+                    if t.get('id') == ticket_id:
+                        return t
+        except Exception as e:
+            print(f"Error fetching ticket {ticket_id} from generator: {e}")
+    return None
 
 def get_waha_url():
     waha_env = os.environ.get('WAHA_URL')
     if waha_env:
         return waha_env
     waha_url_row = db_get("SELECT value FROM settings WHERE key = 'waha_url'")
-    if waha_url_row and waha_url_row['value']:
+    if waha_url_row and waha_url_row.get('value'):
         return waha_url_row['value']
     return 'http://localhost:3006'
 
 def db_all(query, params=()):
-    conn = sqlite3.connect(get_db_path())
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    query_lower = query.lower()
+    if "settings" in query_lower:
+        try:
+            r = requests.get(f"{GENERATOR_URL}/api/internal/settings", timeout=5)
+            if r.status_code == 200:
+                return r.json()
+        except Exception as e:
+            print(f"Error fetching all settings from generator: {e}")
+    elif "tickets" in query_lower:
+        try:
+            r = requests.get(f"{GENERATOR_URL}/api/internal/tickets", timeout=5)
+            if r.status_code == 200:
+                return r.json()
+        except Exception as e:
+            print(f"Error fetching active tickets from generator: {e}")
+    elif "payment_methods" in query_lower:
+        try:
+            r = requests.get(f"{GENERATOR_URL}/api/internal/payment-methods", timeout=5)
+            if r.status_code == 200:
+                return r.json()
+        except Exception as e:
+            print(f"Error fetching active payment methods from generator: {e}")
+    elif "chatbot_sessions" in query_lower:
+        # Used for clearing expired sessions. For safety, return empty list or hit internal API.
+        # Chatbot app.py clean_expired_sessions query: SELECT phone FROM chatbot_sessions WHERE step > 0 AND ? - timestamp > ?
+        # We can implement clean_expired_sessions by querying local generator API if needed.
+        pass
+    return []
 
 def db_run(query, params=()):
-    conn = sqlite3.connect(get_db_path())
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    last_id = cursor.lastrowid
-    changes = conn.total_changes
-    conn.commit()
-    conn.close()
-    return {"id": last_id, "changes": changes}
+    query_lower = query.lower()
+    if "insert" in query_lower and "invoices" in query_lower:
+        # params: (session['name'], total_bill, session['paymentMethod'], 'Unpaid', voucher_code, items_json)
+        payload = {
+            "customer_name": params[0],
+            "total_price": params[1],
+            "payment_method": params[2],
+            "status": params[3],
+            "voucher_code": params[4],
+            "items": params[5]
+        }
+        try:
+            r = requests.post(f"{GENERATOR_URL}/api/internal/invoices", json=payload, timeout=5)
+            if r.status_code == 201:
+                return r.json() # {"id": last_id}
+        except Exception as e:
+            print(f"Error posting invoice to generator: {e}")
+    elif "insert" in query_lower and "chatbot_sessions" in query_lower:
+        # params: (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang)
+        phone = params[0]
+        payload = {
+            "step": params[1],
+            "timestamp": params[2],
+            "name": params[3],
+            "ticket_id": params[4],
+            "quantity": params[5],
+            "payment_method": params[6],
+            "bot_mode": params[7],
+            "ticket_status": params[8],
+            "ticket_subject": params[9],
+            "lang": params[10]
+        }
+        try:
+            requests.post(f"{GENERATOR_URL}/api/internal/session/{phone}", json=payload, timeout=5)
+        except Exception as e:
+            print(f"Error updating session {phone} on generator: {e}")
+    elif "update" in query_lower and "chatbot_sessions" in query_lower:
+        # Delete/Reset session query is an UPDATE query
+        # params is (cleaned,)
+        phone = params[0]
+        payload = {
+            "step": 0,
+            "timestamp": time.time(),
+            "name": None,
+            "ticket_id": None,
+            "quantity": None,
+            "payment_method": None,
+            "bot_mode": "bot",
+            "ticket_status": "closed",
+            "ticket_subject": None,
+            "lang": "id"
+        }
+        try:
+            requests.post(f"{GENERATOR_URL}/api/internal/session/{phone}", json=payload, timeout=5)
+        except Exception as e:
+            print(f"Error resetting session {phone} on generator: {e}")
+    elif "insert" in query_lower and "whatsapp_logs" in query_lower:
+        # params: (phone, message, reply)
+        payload = {
+            "phone": params[0],
+            "message": params[1],
+            "reply": params[2]
+        }
+        try:
+            requests.post(f"{GENERATOR_URL}/api/internal/logs", json=payload, timeout=5)
+        except Exception as e:
+            print(f"Error posting log to generator: {e}")
+    return {"id": 0, "changes": 0}
 
 # Chatbot Session Helpers (Database-Backed)
 SESSION_TIMEOUT = 5 * 60  # 5 minutes
@@ -169,15 +238,14 @@ def delete_session(phone):
     )
 
 def clear_expired_sessions():
-    now = time.time()
-    expired_rows = db_all("SELECT phone FROM chatbot_sessions WHERE step > 0 AND ? - timestamp > ?", (now, SESSION_TIMEOUT))
-    for r in expired_rows:
-        db_run(
-            """UPDATE chatbot_sessions 
-               SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL 
-               WHERE phone = ?""",
-            (r['phone'],)
-        )
+    try:
+        r = requests.post(f"{GENERATOR_URL}/api/internal/session/clear-expired", json={"timeoutSec": SESSION_TIMEOUT}, timeout=5)
+        if r.status_code == 200:
+            expired = r.json()
+            if expired:
+                print(f"Cleared expired sessions for: {expired}")
+    except Exception as e:
+        print(f"Error clearing expired sessions: {e}")
 
 # Pure Python Cosine Similarity & TF-IDF for RAG
 def tokenize(text):

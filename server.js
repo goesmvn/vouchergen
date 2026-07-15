@@ -534,6 +534,103 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
+// Internal API routes for Chatbot Python (Single Writer pattern)
+app.get('/api/internal/settings', async (req, res) => {
+  try {
+    const rows = await dbAll('SELECT * FROM settings');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/internal/tickets', async (req, res) => {
+  try {
+    const rows = await dbAll('SELECT * FROM tickets WHERE is_active = 1');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/internal/payment-methods', async (req, res) => {
+  try {
+    const rows = await dbAll('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY name ASC');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/internal/invoices', async (req, res) => {
+  const { customer_name, total_price, payment_method, status, voucher_code, items } = req.body;
+  try {
+    const result = await dbRun(
+      'INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, items) VALUES (?, ?, ?, ?, ?, ?)',
+      [customer_name, total_price, payment_method, status, voucher_code, items]
+    );
+    res.status(201).json({ id: result.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/internal/session/:phone', async (req, res) => {
+  try {
+    const row = await dbGet('SELECT * FROM chatbot_sessions WHERE phone = ?', [req.params.phone]);
+    res.json(row || null);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/internal/session/:phone', async (req, res) => {
+  const { step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang } = req.body;
+  try {
+    await dbRun(
+      `INSERT OR REPLACE INTO chatbot_sessions 
+       (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/internal/session/clear-expired', async (req, res) => {
+  const { timeoutSec } = req.body;
+  const cutoff = (Date.now() / 1000) - (timeoutSec || 300);
+  try {
+    const expired = await dbAll('SELECT phone FROM chatbot_sessions WHERE step > 0 AND timestamp < ?', [cutoff]);
+    for (const r of expired) {
+      await dbRun(
+        `UPDATE chatbot_sessions 
+         SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL 
+         WHERE phone = ?`,
+        [r.phone]
+      );
+    }
+    res.json(expired);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/internal/logs', async (req, res) => {
+  const { phone, message, reply } = req.body;
+  try {
+    await dbRun(
+      'INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)',
+      [phone, message, reply]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put('/api/settings', authenticateToken, async (req, res) => {
   const settingsData = req.body;
   try {
