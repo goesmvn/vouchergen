@@ -1254,6 +1254,12 @@
                     </select>
                   </div>
 
+                  <!-- Down Payment Field -->
+                  <div class="flex flex-col gap-1.5">
+                    <label for="checkout-down-payment" class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Down Payment / DP (Rp)</label>
+                    <input type="text" id="checkout-down-payment" placeholder="e.g. 50.000 (0 for unpaid/full)" class="w-full px-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm focus:outline-none focus:border-primary" oninput="formatNumberInput(this)">
+                  </div>
+
                   <!-- Selected Ticket Items -->
                   <div>
                     <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Ticket Items</p>
@@ -1940,6 +1946,30 @@
             </div>
             <button id="btn-confirm-redeem" onclick="redeemScannedCode()" class="w-full bg-primary text-on-primary py-2 rounded font-bold text-xs hover:bg-surface-tint hidden">Redeem Ticket</button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD PAYMENT MODAL -->
+  <div id="add-payment-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+    <div class="modal-overlay absolute inset-0 bg-on-background/40 backdrop-blur-sm" onclick="closeAddPaymentModal()"></div>
+    <div class="modal-content relative z-10 w-full max-w-sm p-6 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg no-print">
+      <button class="modal-close-btn absolute top-4 right-4" onclick="closeAddPaymentModal()">✕</button>
+      <h3 class="font-headline-sm text-headline-sm font-semibold mb-4 text-primary">Tambah Pembayaran</h3>
+      <input type="hidden" id="add-payment-invoice-id">
+      <div class="space-y-4">
+        <div class="bg-surface-container-low rounded-lg p-3 flex justify-between items-center">
+          <span class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Sisa Tagihan</span>
+          <span id="add-payment-remaining" class="font-bold text-red-600">Rp 0</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="add-payment-amount" class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Nominal Pembayaran (Rp)</label>
+          <input type="text" id="add-payment-amount" placeholder="e.g. 50.000" required class="w-full px-4 py-2.5 border border-outline-variant rounded-lg text-sm focus:outline-none focus:border-primary" oninput="formatNumberInput(this)">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="submitAddPayment()" class="flex-grow bg-primary text-on-primary py-2.5 px-4 rounded-lg font-bold hover:bg-surface-tint transition-all">Bayar</button>
+          <button onclick="closeAddPaymentModal()" class="bg-surface-container-high text-on-surface px-4 py-2.5 rounded-lg hover:bg-surface-dim transition-all">Batal</button>
         </div>
       </div>
     </div>

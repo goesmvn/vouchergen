@@ -98,6 +98,7 @@ async function initializeDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer_name TEXT NOT NULL,
         total_price REAL NOT NULL,
+        down_payment REAL DEFAULT 0,
         payment_method TEXT,
         status TEXT DEFAULT 'Unpaid',
         voucher_code TEXT UNIQUE,
@@ -106,6 +107,14 @@ async function initializeDatabase() {
         items TEXT NOT NULL
       )
     `);
+
+    // Safe migration: Add down_payment column to invoices if it doesn't exist
+    try {
+      await dbRun('ALTER TABLE invoices ADD COLUMN down_payment REAL DEFAULT 0');
+      console.log('Added down_payment column to invoices.');
+    } catch (e) {
+      // Column already exists, ignore
+    }
 
     // Redemptions Table (to track double scanning)
     await dbRun(`
@@ -242,14 +251,29 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Simple Auth Middleware
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const token = req.headers['authorization'];
-  // Allow dinamic tokens OR fallback static token for persistent sessions over container redeploys
-  if (token === 'admin-secret-token') {
-    next();
-  } else {
-    res.status(401).json({ error: 'Unauthorized access. Please login.' });
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized access. Token missing.' });
   }
+
+  // Allow static admin token
+  if (token === 'admin-secret-token') {
+    return next();
+  }
+
+  // Also check if it's a dynamic chatbot token/session from database
+  try {
+    const session = await dbGet('SELECT phone FROM chatbot_sessions WHERE phone = ?', [token]);
+    if (session) {
+      return next();
+    }
+  } catch (err) {
+    console.error('Error verifying chatbot session token:', err);
+  }
+
+  res.status(401).json({ error: 'Unauthorized access. Please login.' });
 };
 
 // Auth endpoint
@@ -354,7 +378,7 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', authenticateToken, async (req, res) => {
-  const { customerName, items, paymentMethod, visitDate } = req.body;
+  const { customerName, items, paymentMethod, visitDate, downPayment } = req.body;
   if (!customerName || !items || !items.length || !paymentMethod) {
     return res.status(400).json({ error: 'All fields are required' });
   }
@@ -379,21 +403,30 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
       });
     }
 
-    // Generate unique code
-    const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
+    const dpValue = parseFloat(downPayment) || 0;
+    let initialStatus = 'Unpaid';
+    let voucherCode = null;
+
+    if (dpValue >= totalPrice) {
+      initialStatus = 'Paid';
+      const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+      voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
+    } else if (dpValue > 0) {
+      initialStatus = 'DP';
+    }
 
     const result = await dbRun(
-      'INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, visit_date, items) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [customerName, totalPrice, paymentMethod, 'Unpaid', voucherCode, visitDate || null, JSON.stringify(validatedItems)]
+      'INSERT INTO invoices (customer_name, total_price, down_payment, payment_method, status, voucher_code, visit_date, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [customerName, totalPrice, dpValue, paymentMethod, initialStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems)]
     );
 
     res.status(201).json({
       id: result.id,
       customer_name: customerName,
       total_price: totalPrice,
+      down_payment: dpValue,
       payment_method: paymentMethod,
-      status: 'Unpaid',
+      status: initialStatus,
       voucher_code: voucherCode,
       visit_date: visitDate || null,
       items: validatedItems
@@ -411,8 +444,63 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    await dbRun("UPDATE invoices SET status = 'Paid' WHERE id = ?", [id]);
-    res.json({ message: 'Payment confirmed successfully', status: 'Paid' });
+    // Generate voucher code on full payment
+    let voucherCode = invoice.voucher_code;
+    if (!voucherCode) {
+      const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+      voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
+    }
+
+    await dbRun(
+      "UPDATE invoices SET status = 'Paid', down_payment = ?, voucher_code = ? WHERE id = ?",
+      [invoice.total_price, voucherCode, id]
+    );
+    res.json({ message: 'Payment confirmed successfully', status: 'Paid', voucher_code: voucherCode });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add payment (partial/DP) to invoice
+app.post('/api/invoices/:id/add-payment', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { amount } = req.body;
+  try {
+    const invoice = await dbGet('SELECT * FROM invoices WHERE id = ?', [id]);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (invoice.status === 'Paid') {
+      return res.status(400).json({ error: 'Invoice already fully paid' });
+    }
+
+    const addAmount = parseFloat(amount) || 0;
+    if (addAmount <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    const newDP = (invoice.down_payment || 0) + addAmount;
+    const isFullyPaid = newDP >= invoice.total_price;
+    const newStatus = isFullyPaid ? 'Paid' : 'DP';
+
+    let voucherCode = invoice.voucher_code;
+    if (isFullyPaid && !voucherCode) {
+      const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+      voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
+    }
+
+    await dbRun(
+      'UPDATE invoices SET down_payment = ?, status = ?, voucher_code = ? WHERE id = ?',
+      [newDP, newStatus, voucherCode, id]
+    );
+
+    res.json({
+      message: isFullyPaid ? 'Payment complete! Voucher issued.' : 'Down payment recorded.',
+      status: newStatus,
+      down_payment: newDP,
+      remaining: Math.max(0, invoice.total_price - newDP),
+      voucher_code: voucherCode
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -572,11 +660,11 @@ app.get('/api/internal/payment-methods', async (req, res) => {
 });
 
 app.post('/api/internal/invoices', async (req, res) => {
-  const { customer_name, total_price, payment_method, status, voucher_code, items } = req.body;
+  const { customer_name, total_price, down_payment, payment_method, status, voucher_code, items } = req.body;
   try {
     const result = await dbRun(
-      'INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, items) VALUES (?, ?, ?, ?, ?, ?)',
-      [customer_name, total_price, payment_method, status, voucher_code, items]
+      'INSERT INTO invoices (customer_name, total_price, down_payment, payment_method, status, voucher_code, items) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [customer_name, total_price, down_payment || 0, payment_method, status, voucher_code, items]
     );
     res.status(201).json({ id: result.id });
   } catch (error) {

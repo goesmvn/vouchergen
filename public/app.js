@@ -676,9 +676,11 @@ function renderDashboardStats() {
   recents.forEach(inv => {
     const isPaid = inv.current_status === 'Paid';
     const isRedeemed = inv.current_status === 'Redeemed';
+    const isDP = inv.current_status === 'DP';
     let badge = `<span class="badge badge-unpaid">Unpaid</span>`;
     if (isRedeemed) badge = `<span class="badge badge-redeemed">Redeemed</span>`;
     else if (isPaid) badge = `<span class="badge badge-paid">Paid</span>`;
+    else if (isDP) badge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP</span>`;
 
     const items = inv.items || [];
     const firstItem = items[0] || { ticket_title: '-' };
@@ -710,6 +712,7 @@ function renderOrdersTable() {
     const isPaid = inv.current_status === 'Paid';
     const isRedeemed = inv.current_status === 'Redeemed';
     
+    const isDP = inv.current_status === 'DP';
     let statusBadge = `<span class="badge badge-unpaid">Unpaid</span>`;
     let actionBtn = `<button class="btn btn-success btn-sm" onclick="confirmPayment(${inv.id})">Confirm Payment</button>`;
     
@@ -720,6 +723,13 @@ function renderOrdersTable() {
       statusBadge = `<span class="badge badge-paid">Paid</span>`;
       actionBtn = `
         <button class="btn btn-primary btn-sm" onclick="openVoucherModal('${inv.voucher_code}')">View Voucher</button>
+        <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
+      `;
+    } else if (isDP) {
+      const remaining = Math.max(0, inv.total_price - (inv.down_payment || 0));
+      statusBadge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP (Sisa: Rp ${remaining.toLocaleString('id-ID')})</span>`;
+      actionBtn = `
+        <button class="btn btn-success btn-sm" onclick="showAddPaymentModal(${inv.id}, ${remaining})">Add Payment</button>
         <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
       `;
     } else {
@@ -763,9 +773,14 @@ function renderInvoicesTable() {
   invoiceCatalog.forEach(inv => {
     const isPaid = inv.current_status === 'Paid';
     const isRedeemed = inv.current_status === 'Redeemed';
+    const isDP = inv.current_status === 'DP';
     let statusBadge = `<span class="badge badge-unpaid">Unpaid</span>`;
     if (isRedeemed) statusBadge = `<span class="badge badge-redeemed">Redeemed</span>`;
     else if (isPaid) statusBadge = `<span class="badge badge-paid">Paid</span>`;
+    else if (isDP) {
+      const remaining = Math.max(0, inv.total_price - (inv.down_payment || 0));
+      statusBadge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP (Sisa: Rp ${remaining.toLocaleString('id-ID')})</span>`;
+    }
 
     const items = inv.items || [];
     const firstItem = items[0] || { ticket_title: '-' };
@@ -905,6 +920,7 @@ function renderCustomersTable() {
     let badge = `<span class="badge badge-unpaid">Unpaid</span>`;
     if (p.status === 'Redeemed') badge = `<span class="badge badge-redeemed">Redeemed</span>`;
     else if (p.status === 'Paid') badge = `<span class="badge badge-paid">Paid</span>`;
+    else if (p.status === 'DP') badge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP</span>`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1390,6 +1406,9 @@ function showBookingConfirm() {
   const serviceFee = parseFloat(appSettings.service_fee) || 0;
   const discLabel = document.getElementById('checkout-discount-label')?.value.trim() || appSettings.discount_label || 'Discount';
   
+  const rawDP = (document.getElementById('checkout-down-payment')?.value || '').replace(/\./g, '');
+  const dpValue = parseFloat(rawDP) || 0;
+
   let discountAmt = 0;
   if (discType === 'percentage') {
     discountAmt = Math.round(subtotal * discountVal / 100);
@@ -1399,6 +1418,7 @@ function showBookingConfirm() {
   const afterDiscount = Math.max(0, subtotal - discountAmt);
   const taxAmt = Math.round(afterDiscount * taxRate / 100);
   const total = afterDiscount + taxAmt + serviceFee;
+  const remainingBalance = Math.max(0, total - dpValue);
 
   const itemRows = selectedItems.map(({ ticket, qty }) =>
     `<div class="flex justify-between text-xs py-1 border-b border-outline-variant last:border-0">
@@ -1419,7 +1439,11 @@ function showBookingConfirm() {
       ${discountVal > 0 ? `<div class="flex justify-between text-emerald-600"><span>${discLabel} ${discType === 'percentage' ? `(${discountVal}%)` : ''}</span><span class="font-semibold">- Rp ${discountAmt.toLocaleString('id-ID')}</span></div>` : ''}
       ${taxRate > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Tax (${taxRate}%)</span><span class="font-semibold">Rp ${taxAmt.toLocaleString('id-ID')}</span></div>` : ''}
       ${serviceFee > 0 ? `<div class="flex justify-between text-on-surface-variant"><span>Service Fee</span><span class="font-semibold">Rp ${serviceFee.toLocaleString('id-ID')}</span></div>` : ''}
-      <div class="flex justify-between border-t border-outline-variant pt-2 mt-1"><span class="font-bold text-sm text-on-surface">Total</span><span class="font-black text-primary text-sm">Rp ${total.toLocaleString('id-ID')}</span></div>
+      <div class="flex justify-between border-t border-outline-variant pt-2 mt-1"><span class="font-bold text-sm text-on-surface">Total Bill</span><span class="font-black text-primary text-sm">Rp ${total.toLocaleString('id-ID')}</span></div>
+      ${dpValue > 0 ? `
+        <div class="flex justify-between text-orange-600 font-semibold"><span>Down Payment (DP)</span><span>Rp ${dpValue.toLocaleString('id-ID')}</span></div>
+        <div class="flex justify-between text-on-surface-variant font-bold border-t border-dashed border-outline-variant pt-1 mt-1"><span>Remaining Balance</span><span>Rp ${remainingBalance.toLocaleString('id-ID')}</span></div>
+      ` : ''}
     </div>`;
   document.getElementById('booking-confirm-modal').classList.remove('hidden');
 }
@@ -1467,7 +1491,8 @@ async function processBookingSubmit(payDirectly = false) {
         customerName,
         items: orderItems,
         paymentMethod,
-        visitDate: selectedBookingDateString || null
+        visitDate: selectedBookingDateString || null,
+        downPayment: parseFloat((document.getElementById('checkout-down-payment')?.value || '').replace(/\./g, '')) || 0
       })
     });
 
@@ -1717,6 +1742,8 @@ async function openInvoiceDetails(invoiceId) {
     const isPaid = inv.current_status === 'Paid';
     const isRedeemed = inv.current_status === 'Redeemed';
 
+    const isDP = inv.current_status === 'DP';
+
     // Set modal header title
     const headerTitle = document.querySelector('.modal-action-row h3');
     if (headerTitle) headerTitle.innerText = `Invoice #${inv.id}`;
@@ -1732,7 +1759,14 @@ async function openInvoiceDetails(invoiceId) {
 
     if (!isPaid && !isRedeemed) {
       payBtn.classList.remove('hidden');
-      payBtn.onclick = () => confirmPaymentFromModal(inv.id);
+      if (isDP) {
+        const remaining = Math.max(0, inv.total_price - (inv.down_payment || 0));
+        payBtn.innerText = `Confirm Payment (Rp ${remaining.toLocaleString('id-ID')})`;
+        payBtn.onclick = () => confirmPaymentFromModal(inv.id);
+      } else {
+        payBtn.innerText = 'Confirm Payment';
+        payBtn.onclick = () => confirmPaymentFromModal(inv.id);
+      }
       viewVchBtn.classList.add('hidden');
     } else if (isPaid) {
       payBtn.classList.add('hidden');
@@ -1762,10 +1796,18 @@ async function openInvoiceDetails(invoiceId) {
           <div class="inv-id-block text-right">
             <h1 class="text-4xl font-extrabold text-primary tracking-wide mb-3">INVOICE</h1>
             <table class="ml-auto">
+            ${(() => {
+              let statusColorClass = 'inv-status-unpaid text-red-500';
+              if (isPaid || isRedeemed) statusColorClass = 'inv-status-paid text-green-600';
+              else if (isDP) statusColorClass = 'text-yellow-600';
+
+              return `
               <tr><td class="label font-semibold text-right pr-3 text-gray-700">Invoice ID:</td><td class="value font-mono text-gray-600">#INV-${inv.id}</td></tr>
               <tr><td class="label font-semibold text-right pr-3 text-gray-700">Date Issued:</td><td class="value text-gray-600">${new Date(inv.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
               <tr><td class="label font-semibold text-right pr-3 text-gray-700">Payment:</td><td class="value text-gray-600">${inv.payment_method}</td></tr>
-              <tr><td class="label font-semibold text-right pr-3 text-gray-700">Status:</td><td class="value ${isPaid || isRedeemed ? 'inv-status-paid text-green-600' : 'inv-status-unpaid text-red-500'} font-bold">${inv.current_status.toUpperCase()}</td></tr>
+              <tr><td class="label font-semibold text-right pr-3 text-gray-700">Status:</td><td class="value ${statusColorClass} font-bold">${inv.current_status.toUpperCase()}</td></tr>
+              `;
+            })()}
             </table>
           </div>
         </div>
@@ -1852,6 +1894,25 @@ async function openInvoiceDetails(invoiceId) {
               <span class="label text-lg font-extrabold text-primary">Total Due</span>
               <span class="amount text-xl font-extrabold text-primary font-mono whitespace-nowrap">Rp ${p.total.toLocaleString('id-ID')}</span>
             </div>
+            ${(inv.down_payment || 0) > 0 && inv.current_status !== 'Paid' && inv.current_status !== 'Redeemed' ? `
+            <div class="total-row flex justify-between text-yellow-700 mt-2">
+              <span class="font-semibold">Down Payment (DP)</span>
+              <span class="amount font-mono whitespace-nowrap font-semibold">Rp ${(inv.down_payment || 0).toLocaleString('id-ID')}</span>
+            </div>
+            <div class="total-row flex justify-between text-red-600 font-bold">
+              <span>Remaining Balance</span>
+              <span class="amount font-mono whitespace-nowrap">Rp ${Math.max(0, p.total - (inv.down_payment || 0)).toLocaleString('id-ID')}</span>
+            </div>
+            <div class="mt-3">
+              <button onclick="showAddPaymentModal(${inv.id}, ${Math.max(0, p.total - (inv.down_payment || 0))})" class="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-bold rounded-lg transition-all">+ Add Payment</button>
+            </div>
+            ` : ''}
+            ${(inv.down_payment || 0) > 0 && (inv.current_status === 'Paid' || inv.current_status === 'Redeemed') ? `
+            <div class="total-row flex justify-between text-green-600 mt-2">
+              <span class="font-semibold">Total Paid</span>
+              <span class="amount font-mono whitespace-nowrap font-semibold">Rp ${(inv.down_payment || 0).toLocaleString('id-ID')}</span>
+            </div>
+            ` : ''}
               `;
             })()}
           </div>
@@ -3042,6 +3103,85 @@ async function handleRestoreFileSelected(input) {
   } catch (err) {
     showToast(err.message, true);
     input.value = '';
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Down Payment: Show Add Payment Modal
+function showAddPaymentModal(invoiceId, remaining) {
+  const modal = document.getElementById('add-payment-modal');
+  if (modal) {
+    document.getElementById('add-payment-invoice-id').value = invoiceId;
+    document.getElementById('add-payment-remaining').innerText = `Rp ${remaining.toLocaleString('id-ID')}`;
+    document.getElementById('add-payment-amount').value = '';
+    modal.classList.remove('hidden');
+  } else {
+    // Fallback: prompt
+    addPaymentToInvoice(invoiceId);
+  }
+}
+
+function closeAddPaymentModal() {
+  const modal = document.getElementById('add-payment-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function submitAddPayment() {
+  const invoiceId = document.getElementById('add-payment-invoice-id').value;
+  const rawAmount = (document.getElementById('add-payment-amount').value || '').replace(/\./g, '');
+  const amount = parseFloat(rawAmount) || 0;
+  if (amount <= 0) { showToast('Masukkan nominal pembayaran!', true); return; }
+
+  try {
+    showLoading(true, 'Processing...', 'Recording payment...');
+    const response = await fetch(`/api/invoices/${invoiceId}/add-payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ amount })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to add payment');
+
+    showToast(data.message);
+    closeAddPaymentModal();
+    await loadInvoices();
+    if (currentTab === 'orders') renderOrdersTable();
+    if (currentTab === 'invoices') renderInvoicesTable();
+    if (currentTab === 'dashboard') renderDashboardStats();
+    openInvoiceDetails(parseInt(invoiceId));
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Fallback prompt-based add payment
+async function addPaymentToInvoice(invoiceId) {
+  const input = prompt('Masukkan nominal pembayaran (Rp):');
+  if (!input) return;
+  const amount = parseFloat(input.replace(/\./g, '')) || 0;
+  if (amount <= 0) { showToast('Nominal tidak valid!', true); return; }
+
+  try {
+    showLoading(true, 'Processing...', 'Recording payment...');
+    const response = await fetch(`/api/invoices/${invoiceId}/add-payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ amount })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to add payment');
+
+    showToast(data.message);
+    await loadInvoices();
+    if (currentTab === 'orders') renderOrdersTable();
+    if (currentTab === 'invoices') renderInvoicesTable();
+    if (currentTab === 'dashboard') renderDashboardStats();
+    openInvoiceDetails(invoiceId);
+  } catch (err) {
+    showToast(err.message, true);
   } finally {
     showLoading(false);
   }
