@@ -718,12 +718,16 @@ function renderOrdersTable() {
     
     if (isRedeemed) {
       statusBadge = `<span class="badge badge-redeemed">Redeemed</span>`;
-      actionBtn = `<button class="btn btn-secondary btn-sm" onclick="openInvoiceDetails(${inv.id})">Details</button>`;
+      actionBtn = `
+        <button class="btn btn-secondary btn-sm" onclick="openInvoiceDetails(${inv.id})">Details</button>
+        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
+      `;
     } else if (isPaid) {
       statusBadge = `<span class="badge badge-paid">Paid</span>`;
       actionBtn = `
         <button class="btn btn-primary btn-sm" onclick="openVoucherModal('${inv.voucher_code}')">View Voucher</button>
         <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
+        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
       `;
     } else if (isDP) {
       const remaining = Math.max(0, inv.total_price - (inv.down_payment || 0));
@@ -731,11 +735,13 @@ function renderOrdersTable() {
       actionBtn = `
         <button class="btn btn-success btn-sm" onclick="showAddPaymentModal(${inv.id}, ${remaining})">Add Payment</button>
         <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
+        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
       `;
     } else {
       actionBtn = `
         ${actionBtn}
         <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
+        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
       `;
     }
 
@@ -797,6 +803,7 @@ function renderInvoicesTable() {
       <td>${statusBadge}</td>
       <td>
         <button class="bg-primary text-on-primary py-1 px-3 rounded text-xs font-semibold hover:bg-surface-tint" onclick="openInvoiceDetails(${inv.id})">View Invoice</button>
+        <button class="bg-error text-on-error py-1 px-3 rounded text-xs font-semibold hover:bg-red-700 transition-all ml-1" onclick="deleteInvoice(${inv.id})">Delete</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1754,8 +1761,14 @@ async function openInvoiceDetails(invoiceId) {
     // Manage header action buttons
     const payBtn = document.getElementById('modal-pay-btn');
     const viewVchBtn = document.getElementById('modal-view-vch-btn');
+    const deleteBtn = document.getElementById('modal-delete-btn');
     const pdfBtn = document.getElementById('modal-download-pdf-btn');
     if (pdfBtn) pdfBtn.classList.add('hidden');
+
+    if (deleteBtn) {
+      deleteBtn.classList.remove('hidden');
+      deleteBtn.onclick = () => deleteInvoiceFromModal(inv.id);
+    }
 
     if (!isPaid && !isRedeemed) {
       payBtn.classList.remove('hidden');
@@ -2013,6 +2026,8 @@ async function openVoucherModal(code) {
     // Manage header action buttons (hide both)
     document.getElementById('modal-pay-btn').classList.add('hidden');
     document.getElementById('modal-view-vch-btn').classList.add('hidden');
+    const deleteBtn = document.getElementById('modal-delete-btn');
+    if (deleteBtn) deleteBtn.classList.add('hidden');
     const pdfBtn = document.getElementById('modal-download-pdf-btn');
     if (pdfBtn) {
       pdfBtn.classList.remove('hidden');
@@ -3180,6 +3195,58 @@ async function addPaymentToInvoice(invoiceId) {
     if (currentTab === 'invoices') renderInvoicesTable();
     if (currentTab === 'dashboard') renderDashboardStats();
     openInvoiceDetails(invoiceId);
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Delete Invoice logic
+async function deleteInvoice(invoiceId) {
+  const confirmed = confirm(`Apakah Anda yakin ingin menghapus Invoice #${invoiceId}? Tindakan ini permanen.`);
+  if (!confirmed) return;
+
+  try {
+    showLoading(true, 'Deleting...', 'Removing invoice...');
+    const response = await fetch(`/api/invoices/${invoiceId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': token }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete invoice');
+
+    showToast('Invoice deleted successfully!');
+    await loadInvoices();
+    if (currentTab === 'orders') renderOrdersTable();
+    if (currentTab === 'invoices') renderInvoicesTable();
+    if (currentTab === 'dashboard') renderDashboardStats();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function deleteInvoiceFromModal(invoiceId) {
+  const confirmed = confirm(`Apakah Anda yakin ingin menghapus Invoice #${invoiceId}? Tindakan ini akan menutup detail modal.`);
+  if (!confirmed) return;
+
+  try {
+    showLoading(true, 'Deleting...', 'Removing invoice...');
+    const response = await fetch(`/api/invoices/${invoiceId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': token }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete invoice');
+
+    showToast('Invoice deleted successfully!');
+    closeModal();
+    await loadInvoices();
+    if (currentTab === 'orders') renderOrdersTable();
+    if (currentTab === 'invoices') renderInvoicesTable();
+    if (currentTab === 'dashboard') renderDashboardStats();
   } catch (err) {
     showToast(err.message, true);
   } finally {

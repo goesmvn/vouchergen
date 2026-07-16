@@ -461,6 +461,27 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
   }
 });
 
+// Delete invoice and associated redemptions
+app.delete('/api/invoices/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const invoice = await dbGet('SELECT voucher_code FROM invoices WHERE id = ?', [id]);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    
+    // Delete redemptions linked to this invoice code
+    if (invoice.voucher_code) {
+      await dbRun('DELETE FROM redemptions WHERE voucher_code LIKE ?', [`${invoice.voucher_code}%`]);
+    }
+    
+    await dbRun('DELETE FROM invoices WHERE id = ?', [id]);
+    res.json({ message: 'Invoice deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Add payment (partial/DP) to invoice
 app.post('/api/invoices/:id/add-payment', authenticateToken, async (req, res) => {
   const { id } = req.params;
