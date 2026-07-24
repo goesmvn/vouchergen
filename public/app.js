@@ -715,34 +715,34 @@ function renderOrdersTable() {
     
     const isDP = inv.current_status === 'DP';
     let statusBadge = `<span class="badge badge-unpaid">Unpaid</span>`;
-    let actionBtn = `<button class="btn btn-success btn-sm" onclick="confirmPayment(${inv.id})">Confirm Payment</button>`;
+    let actionBtn = `<button class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-all" onclick="confirmPayment(${inv.id})" title="Confirm Payment"><span class="material-symbols-outlined text-[18px]">check_circle</span></button>`;
     
     if (isRedeemed) {
       statusBadge = `<span class="badge badge-redeemed">Redeemed</span>`;
       actionBtn = `
-        <button class="btn btn-secondary btn-sm" onclick="openInvoiceDetails(${inv.id})">Details</button>
-        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
+        <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-all" onclick="openInvoiceDetails(${inv.id})" title="Details"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteInvoice(${inv.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       `;
     } else if (isPaid) {
       statusBadge = `<span class="badge badge-paid">Paid</span>`;
       actionBtn = `
-        <button class="btn btn-primary btn-sm" onclick="openVoucherModal('${inv.voucher_code}')">View Voucher</button>
-        <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
-        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
+        <button class="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-all" onclick="openVoucherModal('${inv.voucher_code}')" title="View Voucher"><span class="material-symbols-outlined text-[18px]">qr_code</span></button>
+        <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-all" onclick="openInvoiceDetails(${inv.id})" title="Details"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteInvoice(${inv.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       `;
     } else if (isDP) {
       const remaining = Math.max(0, inv.total_price - (inv.down_payment || 0));
       statusBadge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP (Sisa: Rp ${remaining.toLocaleString('id-ID')})</span>`;
       actionBtn = `
-        <button class="btn btn-success btn-sm" onclick="showAddPaymentModal(${inv.id}, ${remaining})">Add Payment</button>
-        <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
-        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
+        <button class="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-all" onclick="showAddPaymentModal(${inv.id}, ${remaining})" title="Add Payment"><span class="material-symbols-outlined text-[18px]">payments</span></button>
+        <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-all" onclick="openInvoiceDetails(${inv.id})" title="Details"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteInvoice(${inv.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       `;
     } else {
       actionBtn = `
         ${actionBtn}
-        <button class="btn btn-secondary btn-sm" style="margin-left:5px;" onclick="openInvoiceDetails(${inv.id})">Details</button>
-        <button class="btn btn-error btn-sm" style="margin-left:5px; background-color: var(--danger); color: white;" onclick="deleteInvoice(${inv.id})">Delete</button>
+        <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-all" onclick="openInvoiceDetails(${inv.id})" title="Details"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteInvoice(${inv.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       `;
     }
 
@@ -802,9 +802,9 @@ function renderInvoicesTable() {
       <td>${totalQty}</td>
       <td>Rp ${inv.total_price.toLocaleString('id-ID')}</td>
       <td>${statusBadge}</td>
-      <td>
-        <button class="bg-primary text-on-primary py-1 px-3 rounded text-xs font-semibold hover:bg-surface-tint" onclick="openInvoiceDetails(${inv.id})">View Invoice</button>
-        <button class="bg-error text-on-error py-1 px-3 rounded text-xs font-semibold hover:bg-red-700 transition-all ml-1" onclick="deleteInvoice(${inv.id})">Delete</button>
+      <td class="space-x-1">
+        <button class="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-all" onclick="openInvoiceDetails(${inv.id})" title="View Invoice"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteInvoice(${inv.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -844,7 +844,7 @@ function renderVouchersList() {
       <td>${totalQty}</td>
       <td>${statusBadge}</td>
       <td>
-        <button class="bg-primary text-on-primary py-1 px-3 rounded text-xs font-semibold hover:bg-surface-tint" onclick="openVoucherModal('${inv.voucher_code}')">View Ticket (QR)</button>
+        <button class="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-all" onclick="openVoucherModal('${inv.voucher_code}')" title="View Ticket (QR)"><span class="material-symbols-outlined text-[18px]">qr_code</span></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -958,9 +958,9 @@ function renderStoreTicketsTable() {
       <td><strong>${ticket.title}</strong></td>
       <td>Rp ${ticket.price.toLocaleString('id-ID')}${discText}</td>
       <td><span class="badge ${statusClass}">${statusText}</span></td>
-      <td class="button-row">
-        <button class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-lg text-xs font-semibold hover:bg-opacity-80 transition-all mr-2" onclick="editStoreTicket(${ticket.id}, '${ticket.title.replace(/'/g, "\\'")}', ${ticket.price}, ${ticket.discount || 0}, '${(ticket.description || '').replace(/'/g, "\\'")}', ${ticket.is_active})">Edit</button>
-        <button class="px-3 py-1 bg-error-container text-on-error-container rounded-lg text-xs font-semibold hover:bg-opacity-80 transition-all" onclick="deleteStoreTicket(${ticket.id})">Delete</button>
+      <td class="py-3 px-4 text-sm space-x-2">
+        <button class="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-all" onclick="editStoreTicket(${ticket.id})" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteStoreTicket(${ticket.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -968,22 +968,25 @@ function renderStoreTicketsTable() {
 }
 
 // Edit ticket in Store panel
-function editStoreTicket(id, title, price, discount, description, is_active) {
-  document.getElementById('edit-ticket-id').value = id;
-  document.getElementById('edit-ticket-title').value = title;
+function editStoreTicket(id) {
+  const ticket = ticketCatalog.find(t => t.id === id);
+  if (!ticket) return;
+
+  document.getElementById('edit-ticket-id').value = ticket.id;
+  document.getElementById('edit-ticket-title').value = ticket.title;
   
   const priceEl = document.getElementById('edit-ticket-price');
-  priceEl.value = price;
+  priceEl.value = ticket.price;
   formatNumberInput(priceEl);
   
   const discEl = document.getElementById('edit-ticket-discount');
   if (discEl) {
-    discEl.value = discount || 0;
+    discEl.value = ticket.discount || 0;
     formatNumberInput(discEl);
   }
   
-  document.getElementById('edit-ticket-desc').value = description;
-  document.getElementById('edit-ticket-status').value = is_active;
+  document.getElementById('edit-ticket-desc').value = ticket.description || '';
+  document.getElementById('edit-ticket-status').value = ticket.is_active;
   
   const modal = document.getElementById('edit-ticket-modal');
   if (modal) modal.classList.remove('hidden');
@@ -3067,8 +3070,8 @@ function renderStorePMTable() {
         </span>
       </td>
       <td class="py-3 px-4 text-sm space-x-2">
-        <button class="bg-primary/5 text-primary hover:bg-primary hover:text-white px-3 py-1 rounded transition-all text-xs font-semibold" onclick="editStorePM(${pm.id}, '${pm.name}', ${pm.is_active}, '${(pm.instructions || '').replace(/'/g, "\\'")}')">Edit</button>
-        <button class="bg-error/5 text-error hover:bg-error hover:text-white px-3 py-1 rounded transition-all text-xs font-semibold" onclick="deleteStorePM(${pm.id})">Hapus</button>
+        <button class="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-all" onclick="editStorePM(${pm.id})" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteStorePM(${pm.id})" title="Hapus"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -3085,11 +3088,14 @@ function resetStorePMForm() {
   if (cancelBtn) cancelBtn.classList.add('hidden');
 }
 
-function editStorePM(id, name, isActive, instructions) {
-  document.getElementById('store-pm-edit-id').value = id;
-  document.getElementById('store-pm-name').value = name;
-  document.getElementById('store-pm-instructions').value = instructions || '';
-  document.getElementById('store-pm-status').value = isActive ? '1' : '0';
+function editStorePM(id) {
+  const pm = paymentMethods.find(p => p.id === id);
+  if (!pm) return;
+
+  document.getElementById('store-pm-edit-id').value = pm.id;
+  document.getElementById('store-pm-name').value = pm.name;
+  document.getElementById('store-pm-instructions').value = pm.instructions || '';
+  document.getElementById('store-pm-status').value = pm.is_active ? '1' : '0';
   document.getElementById('store-pm-form-title').innerText = 'Edit Metode Pembayaran';
   const cancelBtn = document.getElementById('btn-store-cancel-pm-edit');
   if (cancelBtn) cancelBtn.classList.remove('hidden');
