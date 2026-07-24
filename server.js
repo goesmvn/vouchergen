@@ -116,6 +116,23 @@ async function initializeDatabase() {
       // Column already exists, ignore
     }
 
+    // Safe migration: Add discount & tax columns to invoices
+    const invoiceCols = [
+      { name: 'discount_rate', type: 'REAL DEFAULT 0' },
+      { name: 'discount_type', type: 'TEXT DEFAULT \'percentage\'' },
+      { name: 'discount_label', type: 'TEXT DEFAULT \'Diskon\'' },
+      { name: 'tax_rate', type: 'REAL DEFAULT 0' },
+      { name: 'service_fee', type: 'REAL DEFAULT 0' }
+    ];
+    for (const col of invoiceCols) {
+      try {
+        await dbRun(`ALTER TABLE invoices ADD COLUMN ${col.name} ${col.type}`);
+        console.log(`Added ${col.name} column to invoices.`);
+      } catch (e) {
+        // ignore if exists
+      }
+    }
+
     // Redemptions Table (to track double scanning)
     await dbRun(`
       CREATE TABLE IF NOT EXISTS redemptions (
@@ -378,7 +395,19 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', authenticateToken, async (req, res) => {
-  const { customerName, items, paymentMethod, visitDate, downPayment } = req.body;
+  const {
+    customerName,
+    items,
+    paymentMethod,
+    visitDate,
+    downPayment,
+    discountRate,
+    discountType,
+    discountLabel,
+    taxRate,
+    serviceFee
+  } = req.body;
+
   if (!customerName || !items || !items.length || !paymentMethod) {
     return res.status(400).json({ error: 'All fields are required' });
   }
@@ -404,10 +433,26 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     }
 
     const dpValue = parseFloat(downPayment) || 0;
+    const discRate = parseFloat(discountRate) || 0;
+    const discType = discountType || 'percentage';
+    const discLabel = discountLabel || 'Diskon';
+    const txRate = parseFloat(taxRate) || 0;
+    const svFee = parseFloat(serviceFee) || 0;
+
+    let discountAmt = 0;
+    if (discType === 'percentage') {
+      discountAmt = Math.round(totalPrice * discRate / 100);
+    } else {
+      discountAmt = discRate;
+    }
+    const afterDiscount = Math.max(0, totalPrice - discountAmt);
+    const taxAmt = Math.round(afterDiscount * txRate / 100);
+    const finalTotal = afterDiscount + taxAmt + svFee;
+
     let initialStatus = 'Unpaid';
     let voucherCode = null;
 
-    if (dpValue >= totalPrice) {
+    if (dpValue >= finalTotal) {
       initialStatus = 'Paid';
       const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
       voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
@@ -416,8 +461,14 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     }
 
     const result = await dbRun(
-      'INSERT INTO invoices (customer_name, total_price, down_payment, payment_method, status, voucher_code, visit_date, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [customerName, totalPrice, dpValue, paymentMethod, initialStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems)]
+      `INSERT INTO invoices (
+        customer_name, total_price, down_payment, payment_method, status, voucher_code, visit_date, items,
+        discount_rate, discount_type, discount_label, tax_rate, service_fee
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        customerName, totalPrice, dpValue, paymentMethod, initialStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
+        discRate, discType, discLabel, txRate, svFee
+      ]
     );
 
     res.status(201).json({
@@ -429,7 +480,12 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
       status: initialStatus,
       voucher_code: voucherCode,
       visit_date: visitDate || null,
-      items: validatedItems
+      items: validatedItems,
+      discount_rate: discRate,
+      discount_type: discType,
+      discount_label: discLabel,
+      tax_rate: txRate,
+      service_fee: svFee
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -451,9 +507,26 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
       voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
     }
 
+    // Calculate actual final total
+    const subtotal = invoice.total_price;
+    const discRate = parseFloat(invoice.discount_rate) || 0;
+    const discType = invoice.discount_type || 'percentage';
+    const txRate = parseFloat(invoice.tax_rate) || 0;
+    const svFee = parseFloat(invoice.service_fee) || 0;
+
+    let discountAmt = 0;
+    if (discType === 'percentage') {
+      discountAmt = Math.round(subtotal * discRate / 100);
+    } else {
+      discountAmt = discRate;
+    }
+    const afterDiscount = Math.max(0, subtotal - discountAmt);
+    const taxAmt = Math.round(afterDiscount * txRate / 100);
+    const finalTotal = afterDiscount + taxAmt + svFee;
+
     await dbRun(
       "UPDATE invoices SET status = 'Paid', down_payment = ?, voucher_code = ? WHERE id = ?",
-      [invoice.total_price, voucherCode, id]
+      [finalTotal, voucherCode, id]
     );
     res.json({ message: 'Payment confirmed successfully', status: 'Paid', voucher_code: voucherCode });
   } catch (error) {
@@ -500,8 +573,25 @@ app.post('/api/invoices/:id/add-payment', authenticateToken, async (req, res) =>
       return res.status(400).json({ error: 'Amount must be greater than 0' });
     }
 
+    // Calculate actual final total
+    const subtotal = invoice.total_price;
+    const discRate = parseFloat(invoice.discount_rate) || 0;
+    const discType = invoice.discount_type || 'percentage';
+    const txRate = parseFloat(invoice.tax_rate) || 0;
+    const svFee = parseFloat(invoice.service_fee) || 0;
+
+    let discountAmt = 0;
+    if (discType === 'percentage') {
+      discountAmt = Math.round(subtotal * discRate / 100);
+    } else {
+      discountAmt = discRate;
+    }
+    const afterDiscount = Math.max(0, subtotal - discountAmt);
+    const taxAmt = Math.round(afterDiscount * txRate / 100);
+    const finalTotal = afterDiscount + taxAmt + svFee;
+
     const newDP = (invoice.down_payment || 0) + addAmount;
-    const isFullyPaid = newDP >= invoice.total_price;
+    const isFullyPaid = newDP >= finalTotal;
     const newStatus = isFullyPaid ? 'Paid' : 'DP';
 
     let voucherCode = invoice.voucher_code;
@@ -519,7 +609,7 @@ app.post('/api/invoices/:id/add-payment', authenticateToken, async (req, res) =>
       message: isFullyPaid ? 'Payment complete! Voucher issued.' : 'Down payment recorded.',
       status: newStatus,
       down_payment: newDP,
-      remaining: Math.max(0, invoice.total_price - newDP),
+      remaining: Math.max(0, finalTotal - newDP),
       voucher_code: voucherCode
     });
   } catch (error) {

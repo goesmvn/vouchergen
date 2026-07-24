@@ -6,11 +6,12 @@ let currentScannedCode = null;
 let appSettings = {};
 
 // Calc pricing breakdown from subtotal using current appSettings
-function calcPricing(subtotal) {
-  const discountType = appSettings.discount_type || 'percentage';
-  const discountRate = parseFloat(appSettings.discount_rate) || 0;
-  const taxRate = parseFloat(appSettings.tax_rate) || 0;
-  const serviceFee = parseFloat(appSettings.service_fee) || 0;
+function calcPricing(subtotal, overrideSettings) {
+  const settings = overrideSettings || appSettings;
+  const discountType = settings.discount_type || 'percentage';
+  const discountRate = parseFloat(settings.discount_rate) || 0;
+  const taxRate = parseFloat(settings.tax_rate) || 0;
+  const serviceFee = parseFloat(settings.service_fee) || 0;
   
   let discountAmt = 0;
   if (discountType === 'percentage') {
@@ -1499,7 +1500,12 @@ async function processBookingSubmit(payDirectly = false) {
         items: orderItems,
         paymentMethod,
         visitDate: selectedBookingDateString || null,
-        downPayment: parseFloat((document.getElementById('checkout-down-payment')?.value || '').replace(/\./g, '')) || 0
+        downPayment: parseFloat((document.getElementById('checkout-down-payment')?.value || '').replace(/\./g, '')) || 0,
+        discountRate: parseFloat(document.getElementById('checkout-discount')?.value) || 0,
+        discountType: document.getElementById('checkout-discount-type')?.value || 'percentage',
+        discountLabel: document.getElementById('checkout-discount-label')?.value.trim() || '',
+        taxRate: parseFloat(document.getElementById('checkout-tax')?.value) || 0,
+        serviceFee: parseFloat(appSettings.service_fee) || 0
       })
     });
 
@@ -1548,7 +1554,8 @@ async function openMultiInvoiceDetails(invoiceIds) {
     if (headerTitle) headerTitle.innerText = `Order: ${first.customer_name} (${invoices.length} Tickets)`;
 
     const safeName = first.customer_name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
-    window.currentPrintTitle = `Invoice_Multiple_${safeName}`;
+    const safeBranding = (appSettings.merchant_name || 'POS').replace(/[^a-zA-Z0-9- ]/g, '_').replace(/\s+/g, '_').trim();
+    window.currentPrintTitle = `${safeBranding}_Invoice_Multiple_${safeName}`;
 
     const payBtn = document.getElementById('modal-pay-btn');
     const viewVchBtn = document.getElementById('modal-view-vch-btn');
@@ -1612,8 +1619,8 @@ async function openMultiInvoiceDetails(invoiceIds) {
     }).join('');
 
     const subtotalAll = invoices.reduce((s, i) => s + i.total_price, 0);
-    const p = calcPricing(subtotalAll);
-    const discLabel = appSettings.discount_label || 'Discount';
+    const p = calcPricing(subtotalAll, first);
+    const discLabel = first.discount_label || appSettings.discount_label || 'Discount';
 
     const visitLabel = first.visit_date || new Date(first.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -1756,7 +1763,8 @@ async function openInvoiceDetails(invoiceId) {
     if (headerTitle) headerTitle.innerText = `Invoice #${inv.id}`;
 
     const safeName = inv.customer_name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
-    window.currentPrintTitle = `Invoice_${inv.id}_${safeName}`;
+    const safeBranding = (appSettings.merchant_name || 'POS').replace(/[^a-zA-Z0-9- ]/g, '_').replace(/\s+/g, '_').trim();
+    window.currentPrintTitle = `${safeBranding}_Invoice_${inv.id}_${safeName}`;
 
     // Manage header action buttons
     const payBtn = document.getElementById('modal-pay-btn');
@@ -1874,9 +1882,9 @@ async function openInvoiceDetails(invoiceId) {
           <div class="inv-totals-inner w-full md:w-2/5 space-y-1.5">
             ${(() => {
               const totalTicketDiscount = (inv.items || []).reduce((sum, item) => sum + ((item.ticket_discount || 0) * item.quantity), 0);
-              const p = calcPricing(inv.total_price);
+              const p = calcPricing(inv.total_price, inv);
               const originalSubtotal = p.subtotal + totalTicketDiscount;
-              const discLabel = appSettings.discount_label || 'Diskon';
+              const discLabel = inv.discount_label || appSettings.discount_label || 'Diskon';
               return `
             <div class="total-row flex justify-between text-gray-700">
               <span>Subtotal</span>
@@ -2037,7 +2045,8 @@ async function openVoucherModal(code) {
     const safeName = validVouchers[0].customer_name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
     const firstCode = validVouchers[0].voucher_code;
     const isMultiple = validVouchers.length > 1;
-    window.currentPrintTitle = isMultiple ? `Voucher_Multiple_${firstCode}_${safeName}` : `Voucher_${firstCode}_${safeName}`;
+    const safeBranding = (appSettings.merchant_name || 'Voucher').replace(/[^a-zA-Z0-9- ]/g, '_').replace(/\s+/g, '_').trim();
+    window.currentPrintTitle = isMultiple ? `${safeBranding}_Voucher_Multiple_${firstCode}_${safeName}` : `${safeBranding}_Voucher_${firstCode}_${safeName}`;
 
     const templatePicker = `
       <div class="flex items-center justify-center gap-2 mb-6 no-print">
