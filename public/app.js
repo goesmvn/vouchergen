@@ -1487,10 +1487,14 @@ async function processBookingSubmit(payDirectly = false) {
 
   try {
     closeBookingConfirm();
-    showLoading(true, payDirectly ? 'Processing Payment...' : 'Creating Invoice...', 'Submitting booking details...');
+    const isEdit = !!window.editingInvoiceId;
+    showLoading(true, payDirectly ? 'Processing Payment...' : (isEdit ? 'Updating Invoice...' : 'Creating Invoice...'), 'Submitting booking details...');
 
-    const response = await fetch('/api/invoices', {
-      method: 'POST',
+    const url = isEdit ? `/api/invoices/${window.editingInvoiceId}` : '/api/invoices';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+      method,
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': token
@@ -1520,7 +1524,7 @@ async function processBookingSubmit(payDirectly = false) {
       });
     }
 
-    showToast(payDirectly ? 'Payment successfully confirmed!' : 'Invoice created successfully!');
+    showToast(payDirectly ? 'Payment successfully confirmed!' : (isEdit ? 'Invoice updated successfully!' : 'Invoice created successfully!'));
     resetBookingFlow();
     await loadInvoices();
     openInvoiceDetails(data.id);
@@ -1533,10 +1537,92 @@ async function processBookingSubmit(payDirectly = false) {
 }
 
 function resetBookingFlow() {
+  window.editingInvoiceId = null;
+  
+  const submitBtn = document.getElementById('booking-submit-btn');
+  if (submitBtn) {
+    submitBtn.innerHTML = `
+      <span class="material-symbols-outlined text-[20px]">receipt_long</span>
+      Review &amp; Confirm
+    `;
+  }
+  
+  const confSaveBtn = document.getElementById('confirm-save-btn');
+  if (confSaveBtn) {
+    confSaveBtn.innerHTML = `
+      <span class="material-symbols-outlined text-[16px]">pending</span>Save (Unpaid)
+    `;
+  }
+  
+  const confPayBtn = document.getElementById('confirm-pay-btn');
+  if (confPayBtn) {
+    confPayBtn.innerHTML = `
+      <span class="material-symbols-outlined text-[16px]">check_circle</span>Pay Directly
+    `;
+  }
+
   document.getElementById('booking-customer-name').value = '';
   document.getElementById('booking-step-1').classList.remove('hidden');
   document.getElementById('booking-step-2').classList.add('hidden');
   renderBookingCatalog();
+}
+
+function startEditInvoice(inv) {
+  closeModal();
+  switchTab('generator');
+  window.editingInvoiceId = inv.id;
+
+  const submitBtn = document.getElementById('booking-submit-btn');
+  if (submitBtn) {
+    submitBtn.innerHTML = `
+      <span class="material-symbols-outlined text-[20px]">edit</span>
+      Update Invoice
+    `;
+  }
+
+  const confSaveBtn = document.getElementById('confirm-save-btn');
+  if (confSaveBtn) {
+    confSaveBtn.innerHTML = `
+      <span class="material-symbols-outlined text-[16px]">edit</span>Update
+    `;
+  }
+
+  const confPayBtn = document.getElementById('confirm-pay-btn');
+  if (confPayBtn) {
+    confPayBtn.innerHTML = `
+      <span class="material-symbols-outlined text-[16px]">check_circle</span>Update &amp; Pay
+    `;
+  }
+
+  document.getElementById('booking-customer-name').value = inv.customer_name || '';
+  document.getElementById('checkout-down-payment').value = inv.down_payment ? inv.down_payment.toLocaleString('id-ID') : '';
+  document.getElementById('checkout-discount').value = inv.discount_rate || '';
+  document.getElementById('checkout-discount-type').value = inv.discount_type || 'percentage';
+  document.getElementById('checkout-discount-label').value = inv.discount_label || '';
+  document.getElementById('checkout-tax').value = inv.tax_rate || '';
+  document.getElementById('booking-payment-method').value = inv.payment_method || 'Cash';
+
+  if (inv.visit_date) {
+    selectedBookingDateString = inv.visit_date;
+    const dateTextEl = document.getElementById('selected-date-text');
+    if (dateTextEl) dateTextEl.innerText = inv.visit_date;
+    const inputEl = document.getElementById('booking-date-input');
+    if (inputEl) inputEl.value = inv.visit_date;
+  }
+
+  renderBookingCatalog();
+
+  if (inv.items && Array.isArray(inv.items)) {
+    inv.items.forEach(item => {
+      bookingQuantities[item.ticket_id] = item.quantity;
+      const qtyInput = document.getElementById(`qty-${item.ticket_id}`);
+      if (qtyInput) {
+        qtyInput.value = item.quantity;
+      }
+    });
+  }
+
+  updateBookingTotal();
 }
 
 // Modal View: Multi-ticket order — render all invoices in 1 combined view
@@ -1769,6 +1855,7 @@ async function openInvoiceDetails(invoiceId) {
     // Manage header action buttons
     const payBtn = document.getElementById('modal-pay-btn');
     const viewVchBtn = document.getElementById('modal-view-vch-btn');
+    const editBtn = document.getElementById('modal-edit-btn');
     const deleteBtn = document.getElementById('modal-delete-btn');
     const pdfBtn = document.getElementById('modal-download-pdf-btn');
     if (pdfBtn) pdfBtn.classList.add('hidden');
@@ -1779,6 +1866,10 @@ async function openInvoiceDetails(invoiceId) {
     }
 
     if (!isPaid && !isRedeemed) {
+      if (editBtn) {
+        editBtn.classList.remove('hidden');
+        editBtn.onclick = () => startEditInvoice(inv);
+      }
       payBtn.classList.remove('hidden');
       if (isDP) {
         const remaining = Math.max(0, inv.total_price - (inv.down_payment || 0));
@@ -1790,10 +1881,12 @@ async function openInvoiceDetails(invoiceId) {
       }
       viewVchBtn.classList.add('hidden');
     } else if (isPaid) {
+      if (editBtn) editBtn.classList.add('hidden');
       payBtn.classList.add('hidden');
       viewVchBtn.classList.remove('hidden');
       viewVchBtn.onclick = () => openVoucherModal(inv.voucher_code);
     } else {
+      if (editBtn) editBtn.classList.add('hidden');
       payBtn.classList.add('hidden');
       viewVchBtn.classList.add('hidden');
     }

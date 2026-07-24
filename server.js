@@ -534,6 +534,128 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const {
+    customerName,
+    items,
+    paymentMethod,
+    visitDate,
+    downPayment,
+    discountRate,
+    discountType,
+    discountLabel,
+    taxRate,
+    serviceFee
+  } = req.body;
+
+  if (!customerName || !items || !items.length || !paymentMethod) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  try {
+    const invoice = await dbGet('SELECT * FROM invoices WHERE id = ?', [id]);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    // Check if status is Paid or Redeemed
+    if (invoice.status === 'Paid' || invoice.status === 'Redeemed') {
+      return res.status(400).json({ error: 'Cannot edit paid or redeemed invoices' });
+    }
+
+    let totalPrice = 0;
+    const validatedItems = [];
+    for (const item of items) {
+      const ticket = await dbGet('SELECT * FROM tickets WHERE id = ?', [item.ticketId]);
+      if (!ticket) {
+        return res.status(404).json({ error: `Ticket type ${item.ticketId} not found` });
+      }
+      const itemTotalPrice = (ticket.price - (ticket.discount || 0)) * item.quantity;
+      totalPrice += itemTotalPrice;
+      validatedItems.push({
+        ticket_id: ticket.id,
+        ticket_title: ticket.title,
+        ticket_price: ticket.price,
+        ticket_discount: ticket.discount || 0,
+        quantity: item.quantity,
+        total_price: itemTotalPrice
+      });
+    }
+
+    const dpValue = parseFloat(downPayment) || 0;
+    const discRate = parseFloat(discountRate) || 0;
+    const discType = discountType || 'percentage';
+    const discLabel = discountLabel || 'Diskon';
+    const txRate = parseFloat(taxRate) || 0;
+    const svFee = parseFloat(serviceFee) || 0;
+
+    let discountAmt = 0;
+    if (discType === 'percentage') {
+      discountAmt = Math.round(totalPrice * discRate / 100);
+    } else {
+      discountAmt = discRate;
+    }
+    const afterDiscount = Math.max(0, totalPrice - discountAmt);
+    const taxAmt = Math.round(afterDiscount * txRate / 100);
+    const finalTotal = afterDiscount + taxAmt + svFee;
+
+    let newStatus = 'Unpaid';
+    let voucherCode = invoice.voucher_code;
+
+    if (dpValue >= finalTotal) {
+      newStatus = 'Paid';
+      if (!voucherCode) {
+        const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+        voucherCode = `VCH-${Date.now().toString().slice(-6)}-${randomHex}`;
+      }
+    } else if (dpValue > 0) {
+      newStatus = 'DP';
+    }
+
+    await dbRun(
+      `UPDATE invoices SET
+        customer_name = ?,
+        total_price = ?,
+        down_payment = ?,
+        payment_method = ?,
+        status = ?,
+        voucher_code = ?,
+        visit_date = ?,
+        items = ?,
+        discount_rate = ?,
+        discount_type = ?,
+        discount_label = ?,
+        tax_rate = ?,
+        service_fee = ?
+      WHERE id = ?`,
+      [
+        customerName, totalPrice, dpValue, paymentMethod, newStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
+        discRate, discType, discLabel, txRate, svFee, id
+      ]
+    );
+
+    res.json({
+      id: parseInt(id),
+      customer_name: customerName,
+      total_price: totalPrice,
+      down_payment: dpValue,
+      payment_method: paymentMethod,
+      status: newStatus,
+      voucher_code: voucherCode,
+      visit_date: visitDate || null,
+      items: validatedItems,
+      discount_rate: discRate,
+      discount_type: discType,
+      discount_label: discLabel,
+      tax_rate: txRate,
+      service_fee: svFee
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete invoice and associated redemptions
 app.delete('/api/invoices/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
