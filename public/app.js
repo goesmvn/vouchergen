@@ -1811,10 +1811,22 @@ function renderUsersTable() {
 function resetUserForm() {
   document.getElementById('store-user-id').value = '';
   document.getElementById('store-user-name').value = '';
-  document.getElementById('store-user-username').value = '';
+  
+  const usernameInput = document.getElementById('store-user-username');
+  if (usernameInput) {
+    usernameInput.value = '';
+    usernameInput.disabled = false;
+  }
+
   document.getElementById('store-user-password').value = '';
   document.getElementById('store-user-avatar').value = '';
-  document.getElementById('store-user-role').value = 'staff';
+  
+  const roleInput = document.getElementById('store-user-role');
+  if (roleInput) {
+    roleInput.value = 'staff';
+    roleInput.disabled = false;
+  }
+
   document.getElementById('user-form-title').innerText = 'Create New User';
   
   // Reset password requirements
@@ -1889,10 +1901,21 @@ function editUser(id) {
 
   document.getElementById('store-user-id').value = user.id;
   document.getElementById('store-user-name').value = user.name;
-  document.getElementById('store-user-username').value = user.username;
+  
+  const usernameInput = document.getElementById('store-user-username');
+  if (usernameInput) {
+    usernameInput.value = user.username;
+    usernameInput.disabled = (user.username === 'admin');
+  }
+
   document.getElementById('store-user-password').value = '';
   document.getElementById('store-user-avatar').value = user.avatar_url || '';
-  document.getElementById('store-user-role').value = user.role || 'staff';
+  
+  const roleInput = document.getElementById('store-user-role');
+  if (roleInput) {
+    roleInput.value = user.role || 'staff';
+    roleInput.disabled = (user.username === 'admin');
+  }
   
   // Make password optional for editing
   document.getElementById('store-user-password').required = false;
