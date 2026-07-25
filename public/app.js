@@ -1115,24 +1115,73 @@ function renderAgentsTable() {
   });
 }
 
-// Populate Agent Select Dropdown in simulator POS
+// Populate Agent Search Dropdown in simulator POS
 function populateAgentSelect() {
-  const select = document.getElementById('booking-agent-select');
-  if (!select) return;
+  filterAgentSearchResults();
+}
 
-  // Keep the first option
-  select.innerHTML = '<option value="">-- Select Agent --</option>';
+window.showAgentSearchResults = function() {
+  const dropdown = document.getElementById('booking-agent-search-results');
+  if (dropdown) dropdown.classList.remove('hidden');
+  filterAgentSearchResults();
+};
 
-  agentsList.forEach(agent => {
-    const opt = document.createElement('option');
-    opt.value = agent.id;
+window.filterAgentSearchResults = function() {
+  const searchInput = document.getElementById('booking-agent-search');
+  const dropdown = document.getElementById('booking-agent-search-results');
+  if (!searchInput || !dropdown) return;
+
+  const query = searchInput.value.trim().toLowerCase();
+  dropdown.innerHTML = '';
+
+  const filtered = agentsList.filter(agent => 
+    agent.name.toLowerCase().includes(query) || 
+    agent.code.toLowerCase().includes(query)
+  );
+
+  if (filtered.length === 0) {
+    dropdown.innerHTML = '<div class="p-3 text-xs text-on-surface-variant italic text-center">No agents found</div>';
+    return;
+  }
+
+  filtered.forEach(agent => {
+    const item = document.createElement('div');
+    item.className = "p-3 text-xs hover:bg-primary/5 cursor-pointer border-b border-outline-variant last:border-0 transition-colors flex justify-between items-center";
     const discLabel = agent.discount_type === 'nominal' 
       ? `Rp ${agent.discount_rate.toLocaleString('id-ID')}` 
       : `${agent.discount_rate}%`;
-    opt.innerText = `${agent.name} (${agent.code}) — ${discLabel}`;
-    select.appendChild(opt);
+    item.innerHTML = `
+      <div>
+        <span class="font-semibold text-on-surface">${agent.name}</span>
+        <span class="text-[10px] text-primary font-code-mono ml-1">(${agent.code})</span>
+      </div>
+      <span class="font-bold text-emerald-600">${discLabel}</span>
+    `;
+    item.onclick = () => selectAgentFromSearch(agent.id, agent.name, agent.code);
+    dropdown.appendChild(item);
   });
-}
+};
+
+window.selectAgentFromSearch = function(id, name, code) {
+  const searchInput = document.getElementById('booking-agent-search');
+  const selectVal = document.getElementById('booking-agent-select');
+  const dropdown = document.getElementById('booking-agent-search-results');
+
+  if (searchInput) searchInput.value = `${name} (${code})`;
+  if (selectVal) selectVal.value = id;
+  if (dropdown) dropdown.classList.add('hidden');
+
+  onAgentSelected();
+};
+
+// Global click listener to close agent search results
+document.addEventListener('click', (event) => {
+  const dropdown = document.getElementById('booking-agent-search-results');
+  const trigger = document.getElementById('booking-agent-search');
+  if (dropdown && !dropdown.classList.contains('hidden') && trigger && !trigger.contains(event.target) && !dropdown.contains(event.target)) {
+    dropdown.classList.add('hidden');
+  }
+});
 
 // Render Top Agents leaderboard based on invoice purchases
 function renderAgentsLeaderboard() {
@@ -1474,6 +1523,8 @@ window.toggleCustomerType = function() {
       labelEl.disabled = false;
     }
     
+    const searchInput = document.getElementById('booking-agent-search');
+    if (searchInput) searchInput.value = '';
     const select = document.getElementById('booking-agent-select');
     if (select) select.value = '';
 
@@ -2120,9 +2171,12 @@ function startEditInvoice(inv) {
   if (inv.agent_id) {
     if (custTypeEl) custTypeEl.value = 'agent';
     toggleCustomerType();
-    const agentSel = document.getElementById('booking-agent-select');
-    if (agentSel) {
-      agentSel.value = inv.agent_id;
+    const agent = agentsList.find(a => a.id === inv.agent_id);
+    if (agent) {
+      const searchInput = document.getElementById('booking-agent-search');
+      if (searchInput) searchInput.value = `${agent.name} (${agent.code})`;
+      const agentSel = document.getElementById('booking-agent-select');
+      if (agentSel) agentSel.value = inv.agent_id;
       // Set input ke agent settings (lock)
       onAgentSelected();
     }
