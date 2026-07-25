@@ -122,7 +122,8 @@ async function initializeDatabase() {
       { name: 'discount_type', type: 'TEXT DEFAULT \'percentage\'' },
       { name: 'discount_label', type: 'TEXT DEFAULT \'Diskon\'' },
       { name: 'tax_rate', type: 'REAL DEFAULT 0' },
-      { name: 'service_fee', type: 'REAL DEFAULT 0' }
+      { name: 'service_fee', type: 'REAL DEFAULT 0' },
+      { name: 'agent_id', type: 'INTEGER DEFAULT NULL' }
     ];
     for (const col of invoiceCols) {
       try {
@@ -132,6 +133,19 @@ async function initializeDatabase() {
         // ignore if exists
       }
     }
+
+    // Agents Table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        code TEXT UNIQUE NOT NULL,
+        phone TEXT,
+        email TEXT,
+        discount_rate REAL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
     // Redemptions Table (to track double scanning)
     await dbRun(`
@@ -405,7 +419,8 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     discountType,
     discountLabel,
     taxRate,
-    serviceFee
+    serviceFee,
+    agentId
   } = req.body;
 
   if (!customerName || !items || !items.length || !paymentMethod) {
@@ -438,6 +453,7 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     const discLabel = discountLabel || 'Diskon';
     const txRate = parseFloat(taxRate) || 0;
     const svFee = parseFloat(serviceFee) || 0;
+    const agId = agentId ? parseInt(agentId) : null;
 
     let discountAmt = 0;
     if (discType === 'percentage') {
@@ -463,11 +479,11 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     const result = await dbRun(
       `INSERT INTO invoices (
         customer_name, total_price, down_payment, payment_method, status, voucher_code, visit_date, items,
-        discount_rate, discount_type, discount_label, tax_rate, service_fee
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        discount_rate, discount_type, discount_label, tax_rate, service_fee, agent_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerName, totalPrice, dpValue, paymentMethod, initialStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
-        discRate, discType, discLabel, txRate, svFee
+        discRate, discType, discLabel, txRate, svFee, agId
       ]
     );
 
@@ -485,7 +501,8 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
       discount_type: discType,
       discount_label: discLabel,
       tax_rate: txRate,
-      service_fee: svFee
+      service_fee: svFee,
+      agent_id: agId
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -546,7 +563,8 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
     discountType,
     discountLabel,
     taxRate,
-    serviceFee
+    serviceFee,
+    agentId
   } = req.body;
 
   if (!customerName || !items || !items.length || !paymentMethod) {
@@ -589,6 +607,7 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
     const discLabel = discountLabel || 'Diskon';
     const txRate = parseFloat(taxRate) || 0;
     const svFee = parseFloat(serviceFee) || 0;
+    const agId = agentId ? parseInt(agentId) : null;
 
     let discountAmt = 0;
     if (discType === 'percentage') {
@@ -627,11 +646,12 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
         discount_type = ?,
         discount_label = ?,
         tax_rate = ?,
-        service_fee = ?
+        service_fee = ?,
+        agent_id = ?
       WHERE id = ?`,
       [
         customerName, totalPrice, dpValue, paymentMethod, newStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
-        discRate, discType, discLabel, txRate, svFee, id
+        discRate, discType, discLabel, txRate, svFee, agId, id
       ]
     );
 
@@ -649,7 +669,8 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
       discount_type: discType,
       discount_label: discLabel,
       tax_rate: txRate,
-      service_fee: svFee
+      service_fee: svFee,
+      agent_id: agId
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -845,6 +866,68 @@ app.post('/api/vouchers/:code/redeem', async (req, res) => {
       items: redeemedItems,
       redeemed_at: new Date().toISOString()
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Agents API CRUD
+app.get('/api/agents', authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll('SELECT * FROM agents ORDER BY name ASC');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/agents', authenticateToken, async (req, res) => {
+  const { name, code, phone, email, discount_rate } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: 'Name and Code are required' });
+  }
+  try {
+    const existing = await dbGet('SELECT id FROM agents WHERE code = ?', [code]);
+    if (existing) {
+      return res.status(400).json({ error: 'Agent code must be unique' });
+    }
+    const result = await dbRun(
+      'INSERT INTO agents (name, code, phone, email, discount_rate) VALUES (?, ?, ?, ?, ?)',
+      [name, code, phone || '', email || '', parseFloat(discount_rate) || 0]
+    );
+    res.status(201).json({ id: result.id, name, code, phone, email, discount_rate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/agents/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { name, code, phone, email, discount_rate } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: 'Name and Code are required' });
+  }
+  try {
+    const existing = await dbGet('SELECT id FROM agents WHERE code = ? AND id != ?', [code, id]);
+    if (existing) {
+      return res.status(400).json({ error: 'Agent code must be unique' });
+    }
+    await dbRun(
+      'UPDATE agents SET name = ?, code = ?, phone = ?, email = ?, discount_rate = ? WHERE id = ?',
+      [name, code, phone || '', email || '', parseFloat(discount_rate) || 0, id]
+    );
+    res.json({ id: parseInt(id), name, code, phone, email, discount_rate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/agents/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await dbRun('UPDATE invoices SET agent_id = NULL WHERE agent_id = ?', [id]);
+    await dbRun('DELETE FROM agents WHERE id = ?', [id]);
+    res.json({ message: 'Agent deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

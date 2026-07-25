@@ -40,6 +40,7 @@ const monthsLong = [
 // Tickets List Cache
 let ticketCatalog = [];
 let invoiceCatalog = [];
+let agentsList = [];
 let bookingQuantities = {};
 let selectedBookingDateString = '';
 let activeVoucherTemplate = 1; // 1=Classic, 2=Boarding Pass, 3=Minimal
@@ -97,6 +98,7 @@ async function loadAllData() {
   await loadTickets();
   await loadInvoices();
   await loadPaymentMethods();
+  await loadAgents();
   // Set default view tab
   switchTab(currentTab);
 }
@@ -462,7 +464,8 @@ function switchTab(tabId) {
       vouchers: 'Vouchers & Tickets',
       orders: 'Transaction logs & Status',
       settings: 'Place configuration & Branding',
-      whatsapp: 'WhatsApp Chatbot Virtual Assistant'
+      whatsapp: 'WhatsApp Chatbot Virtual Assistant',
+      agents: 'Agents Management Directory'
     };
     topPanelEl.innerText = titles[tabId] || 'Batur Hot Spring Admin';
   }
@@ -470,6 +473,7 @@ function switchTab(tabId) {
   // Load context specific content
   if (tabId === 'dashboard') renderDashboardStats();
   if (tabId === 'store') renderStoreTicketsTable();
+  if (tabId === 'agents') loadAgents();
   if (tabId === 'generator') { renderBookingCatalog(); initVisitDateInput(); updateBookingTotal(); }
   if (tabId === 'invoices') renderInvoicesTable();
   if (tabId === 'vouchers') renderVouchersList();
@@ -1026,6 +1030,297 @@ async function deleteStoreTicket(id) {
   }
 }
 
+// Fetch Agents List
+async function loadAgents() {
+  try {
+    const response = await fetch('/api/agents', {
+      headers: { 'Authorization': token }
+    });
+    agentsList = await response.json();
+    
+    renderAgentsTable();
+    populateAgentSelect();
+    renderAgentsLeaderboard();
+  } catch (err) {
+    console.error('Failed to load agents:', err);
+  }
+}
+
+// Render Agents Table
+function renderAgentsTable() {
+  const tbody = document.getElementById('store-agents-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (agentsList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-secondary text-center py-4">No agents registered.</td></tr>';
+    return;
+  }
+
+  agentsList.forEach(agent => {
+    const tr = document.createElement('tr');
+    tr.className = "border-b border-outline-variant hover:bg-surface-container-low transition-colors";
+    tr.innerHTML = `
+      <td class="py-3 px-4 text-sm font-code-mono font-bold text-primary">${agent.code}</td>
+      <td class="py-3 px-4 text-sm">
+        <div class="font-semibold text-on-surface">${agent.name}</div>
+        <div class="text-xs text-on-surface-variant">${agent.email || '-'}</div>
+      </td>
+      <td class="py-3 px-4 text-sm text-on-surface-variant">${agent.phone || '-'}</td>
+      <td class="py-3 px-4 text-sm font-semibold text-emerald-600">${agent.discount_rate}%</td>
+      <td class="py-3 px-4 text-sm space-x-2">
+        <button class="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-all" onclick="editAgent(${agent.id})" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+        <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteAgent(${agent.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Populate Agent Select Dropdown in simulator POS
+function populateAgentSelect() {
+  const select = document.getElementById('booking-agent-select');
+  if (!select) return;
+
+  // Keep the first option
+  select.innerHTML = '<option value="">-- Select Agent --</option>';
+
+  agentsList.forEach(agent => {
+    const opt = document.createElement('option');
+    opt.value = agent.id;
+    opt.innerText = `${agent.name} (${agent.code}) — ${agent.discount_rate}%`;
+    select.appendChild(opt);
+  });
+}
+
+// Render Top Agents leaderboard based on invoice purchases
+function renderAgentsLeaderboard() {
+  const container = document.getElementById('agents-stats-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const paidInvoices = invoiceCatalog.filter(i => (i.current_status === 'Paid' || i.current_status === 'Redeemed') && i.agent_id);
+  
+  const statsMap = {};
+  agentsList.forEach(a => {
+    statsMap[a.id] = { id: a.id, name: a.name, code: a.code, count: 0, totalSpend: 0 };
+  });
+
+  paidInvoices.forEach(inv => {
+    if (statsMap[inv.agent_id]) {
+      statsMap[inv.agent_id].count++;
+      statsMap[inv.agent_id].totalSpend += inv.total_price;
+    }
+  });
+
+  // Convert to array and sort by spend desc
+  const sortedStats = Object.values(statsMap).sort((a, b) => b.totalSpend - a.totalSpend).slice(0, 3);
+
+  // Fill in placeholders if less than 3 top agents
+  while (sortedStats.length < 3) {
+    sortedStats.push({ id: null, name: 'No Agent', code: '—', count: 0, totalSpend: 0 });
+  }
+
+  const trophies = ['🏆 First Place', '🥈 Second Place', '🥉 Third Place'];
+  sortedStats.forEach((stat, idx) => {
+    const card = document.createElement('div');
+    card.className = "bg-surface-container-low p-4 rounded-lg flex items-center justify-between border border-outline-variant";
+    card.innerHTML = `
+      <div>
+        <p class="text-[10px] text-primary uppercase font-black tracking-wider">${trophies[idx]}</p>
+        <h4 class="font-bold text-sm text-on-surface mt-1 truncate max-w-[120px]" title="${stat.name}">${stat.name}</h4>
+        <p class="text-[10px] text-on-surface-variant font-mono">${stat.code}</p>
+      </div>
+      <div class="text-right">
+        <p class="text-xs font-black text-secondary">${stat.count} Orders</p>
+        <p class="text-[11px] text-emerald-600 font-bold">Rp ${stat.totalSpend.toLocaleString('id-ID')}</p>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// Reset Agent CRUD Form
+function resetAgentForm() {
+  document.getElementById('store-agent-id').value = '';
+  document.getElementById('store-agent-name').value = '';
+  document.getElementById('store-agent-code').value = '';
+  document.getElementById('store-agent-phone').value = '';
+  document.getElementById('store-agent-email').value = '';
+  document.getElementById('store-agent-discount').value = '';
+  document.getElementById('agent-form-title').innerText = 'Register New Agent';
+  
+  const cancelBtn = document.getElementById('btn-cancel-agent-edit');
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+// Save Agent CRUD Form
+async function saveAgentForm(event) {
+  event.preventDefault();
+  const id = document.getElementById('store-agent-id').value;
+  const name = document.getElementById('store-agent-name').value.trim();
+  const code = document.getElementById('store-agent-code').value.trim().toUpperCase();
+  const phone = document.getElementById('store-agent-phone').value.trim();
+  const email = document.getElementById('store-agent-email').value.trim();
+  const discount_rate = parseFloat(document.getElementById('store-agent-discount').value) || 0;
+
+  const payload = { name, code, phone, email, discount_rate };
+  const url = id ? `/api/agents/${id}` : '/api/agents';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    showLoading(true, 'Saving Agent...', 'Submitting agent data...');
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to save agent');
+
+    showToast(id ? 'Agent profile updated!' : 'Agent successfully registered!');
+    resetAgentForm();
+    await loadAgents();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Edit Agent Trigger
+function editAgent(id) {
+  const agent = agentsList.find(a => a.id === id);
+  if (!agent) return;
+
+  document.getElementById('store-agent-id').value = agent.id;
+  document.getElementById('store-agent-name').value = agent.name;
+  document.getElementById('store-agent-code').value = agent.code;
+  document.getElementById('store-agent-phone').value = agent.phone || '';
+  document.getElementById('store-agent-email').value = agent.email || '';
+  document.getElementById('store-agent-discount').value = agent.discount_rate || 0;
+  
+  document.getElementById('agent-form-title').innerText = 'Edit Agent Profile';
+  
+  const cancelBtn = document.getElementById('btn-cancel-agent-edit');
+  if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+  // Scroll to form
+  document.getElementById('store-agent-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Delete Agent Trigger
+async function deleteAgent(id) {
+  if (!confirm('Are you sure you want to remove this agent? Customer invoices associated with this agent will keep their discounts but will unbind from agent stats.')) return;
+  try {
+    showLoading(true, 'Removing Agent...', 'Deleting agent profile...');
+    const response = await fetch(`/api/agents/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': token }
+    });
+    if (!response.ok) throw new Error('Failed to delete agent');
+
+    showToast('Agent profile removed.');
+    await loadAgents();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Toggle Customer Type in Voucher Simulator checkout
+window.toggleCustomerType = function() {
+  const type = document.getElementById('booking-customer-type').value;
+  const agentContainer = document.getElementById('booking-agent-container');
+  const discInput = document.getElementById('checkout-discount');
+  const typeEl = document.getElementById('checkout-discount-type');
+  const labelEl = document.getElementById('checkout-discount-label');
+
+  if (type === 'agent') {
+    if (agentContainer) agentContainer.classList.remove('hidden');
+    // Call agent select trigger
+    onAgentSelected();
+  } else {
+    if (agentContainer) agentContainer.classList.add('hidden');
+    
+    // Clear and unlock inputs
+    if (discInput) {
+      discInput.value = parseFloat(appSettings.discount_rate) || '';
+      discInput.disabled = false;
+    }
+    if (typeEl) {
+      typeEl.value = appSettings.discount_type || 'percentage';
+      typeEl.disabled = false;
+    }
+    if (labelEl) {
+      labelEl.value = appSettings.discount_label || '';
+      labelEl.disabled = false;
+    }
+    
+    const select = document.getElementById('booking-agent-select');
+    if (select) select.value = '';
+
+    updateBookingTotal();
+  }
+};
+
+// Agent Selected trigger in Voucher Simulator
+window.onAgentSelected = function() {
+  const select = document.getElementById('booking-agent-select');
+  if (!select) return;
+  
+  const agentId = select.value;
+  const discInput = document.getElementById('checkout-discount');
+  const typeEl = document.getElementById('checkout-discount-type');
+  const labelEl = document.getElementById('checkout-discount-label');
+
+  if (agentId) {
+    const agent = agentsList.find(a => a.id == agentId);
+    if (agent) {
+      // Set discount parameters to agent rate
+      if (discInput) {
+        discInput.value = agent.discount_rate;
+        discInput.disabled = true;
+      }
+      if (typeEl) {
+        typeEl.value = 'percentage';
+        typeEl.disabled = true;
+      }
+      if (labelEl) {
+        labelEl.value = `Diskon Agen: ${agent.name}`;
+        labelEl.disabled = true;
+      }
+      
+      // Auto-populate visitor name if empty with agent name
+      const visitorNameInput = document.getElementById('booking-customer-name');
+      if (visitorNameInput && !visitorNameInput.value.trim()) {
+        visitorNameInput.value = agent.name;
+      }
+    }
+  } else {
+    // Unlock and fallback to standard settings
+    if (discInput) {
+      discInput.value = parseFloat(appSettings.discount_rate) || '';
+      discInput.disabled = false;
+    }
+    if (typeEl) {
+      typeEl.value = appSettings.discount_type || 'percentage';
+      typeEl.disabled = false;
+    }
+    if (labelEl) {
+      labelEl.value = appSettings.discount_label || '';
+      labelEl.disabled = false;
+    }
+  }
+  
+  updateBookingTotal();
+};
+
 // Issued vouchers list (with scan validation info)
 function renderIssuedVouchersTable() {
   const tbody = document.getElementById('issued-table-body');
@@ -1512,7 +1807,8 @@ async function processBookingSubmit(payDirectly = false) {
         discountType: document.getElementById('checkout-discount-type')?.value || 'percentage',
         discountLabel: document.getElementById('checkout-discount-label')?.value.trim() || '',
         taxRate: parseFloat(document.getElementById('checkout-tax')?.value) || 0,
-        serviceFee: parseFloat(appSettings.service_fee) || 0
+        serviceFee: parseFloat(appSettings.service_fee) || 0,
+        agentId: document.getElementById('booking-customer-type').value === 'agent' ? (document.getElementById('booking-agent-select').value || null) : null
       })
     });
 
@@ -1567,6 +1863,13 @@ function resetBookingFlow() {
   document.getElementById('booking-customer-name').value = '';
   document.getElementById('booking-step-1').classList.remove('hidden');
   document.getElementById('booking-step-2').classList.add('hidden');
+  
+  const custTypeEl = document.getElementById('booking-customer-type');
+  if (custTypeEl) {
+    custTypeEl.value = 'regular';
+    toggleCustomerType();
+  }
+  
   renderBookingCatalog();
 }
 
@@ -1599,9 +1902,27 @@ function startEditInvoice(inv) {
 
   document.getElementById('booking-customer-name').value = inv.customer_name || '';
   document.getElementById('checkout-down-payment').value = inv.down_payment ? inv.down_payment.toLocaleString('id-ID') : '';
-  document.getElementById('checkout-discount').value = inv.discount_rate || '';
-  document.getElementById('checkout-discount-type').value = inv.discount_type || 'percentage';
-  document.getElementById('checkout-discount-label').value = inv.discount_label || '';
+  
+  // Set customer type & agent select first
+  const custTypeEl = document.getElementById('booking-customer-type');
+  if (inv.agent_id) {
+    if (custTypeEl) custTypeEl.value = 'agent';
+    toggleCustomerType();
+    const agentSel = document.getElementById('booking-agent-select');
+    if (agentSel) {
+      agentSel.value = inv.agent_id;
+      // Set input ke agent settings (lock)
+      onAgentSelected();
+    }
+  } else {
+    if (custTypeEl) custTypeEl.value = 'regular';
+    toggleCustomerType();
+    
+    document.getElementById('checkout-discount').value = inv.discount_rate || '';
+    document.getElementById('checkout-discount-type').value = inv.discount_type || 'percentage';
+    document.getElementById('checkout-discount-label').value = inv.discount_label || '';
+  }
+  
   document.getElementById('checkout-tax').value = inv.tax_rate || '';
   document.getElementById('booking-payment-method').value = inv.payment_method || 'Cash';
 
@@ -1844,8 +2165,9 @@ async function openInvoiceDetails(invoiceId) {
     const modalBody = document.getElementById('modal-body-container');
     const isPaid = inv.current_status === 'Paid';
     const isRedeemed = inv.current_status === 'Redeemed';
-
     const isDP = inv.current_status === 'DP';
+    
+    const agent = inv.agent_id ? agentsList.find(a => a.id === inv.agent_id) : null;
 
     // Set modal header title
     const headerTitle = document.querySelector('.modal-action-row h3');
@@ -1934,7 +2256,7 @@ async function openInvoiceDetails(invoiceId) {
           <div>
             <p class="bill-to-label text-xs uppercase tracking-widest text-gray-400 mb-1 font-bold">Billed To</p>
             <p class="customer-name text-xl font-bold text-gray-900">${inv.customer_name}</p>
-            <p class="customer-sub text-sm text-gray-500 mt-0.5">Guest Visitor</p>
+            <p class="customer-sub text-sm text-gray-500 mt-0.5">${agent ? `Registered Agent — ${agent.code}` : 'Guest Visitor'}</p>
           </div>
           <div class="mt-3 md:mt-0 text-left md:text-right">
             <p class="ref-label text-xs uppercase tracking-widest text-gray-400 mb-1 font-bold">Order Reference</p>
