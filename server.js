@@ -202,6 +202,35 @@ async function initializeDatabase() {
       )
     `);
 
+    // Users Table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        avatar_url TEXT,
+        role TEXT DEFAULT 'admin',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default admin user
+    const adminUser = await dbGet("SELECT id FROM users WHERE username = 'admin'");
+    if (!adminUser) {
+      await dbRun(
+        "INSERT INTO users (name, username, password, avatar_url, role) VALUES (?, ?, ?, ?, ?)",
+        [
+          'Super Admin',
+          'admin',
+          'admin123',
+          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80',
+          'admin'
+        ]
+      );
+      console.log('Seeded default admin user to users table.');
+    }
+
     // WhatsApp Logs Table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS whatsapp_logs (
@@ -332,15 +361,20 @@ app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   console.log(`Login attempt: username="${username}"`);
   try {
-    const dbUser = await dbGet("SELECT value FROM settings WHERE key = 'admin_username'");
-    const dbPass = await dbGet("SELECT value FROM settings WHERE key = 'admin_password'");
-    
-    const validUser = (dbUser ? dbUser.value : 'admin');
-    const validPass = (dbPass ? dbPass.value : 'admin123');
+    const user = await dbGet("SELECT * FROM users WHERE username = ? AND password = ?", [username, password]);
 
-    if (username === validUser && password === validPass) {
+    if (user) {
       console.log('Login successful');
-      res.json({ token: 'admin-secret-token', role: 'admin' });
+      res.json({ 
+        token: 'admin-secret-token', 
+        user: { 
+          id: user.id, 
+          name: user.name, 
+          username: user.username, 
+          avatar_url: user.avatar_url, 
+          role: user.role 
+        } 
+      });
     } else {
       console.log('Login failed');
       res.status(400).json({ error: 'Invalid username or password' });
@@ -959,6 +993,82 @@ app.delete('/api/agents/:id', authenticateToken, async (req, res) => {
     await dbRun('UPDATE invoices SET agent_id = NULL WHERE agent_id = ?', [id]);
     await dbRun('DELETE FROM agents WHERE id = ?', [id]);
     res.json({ message: 'Agent deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Users API CRUD
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const rows = await dbAll('SELECT id, name, username, avatar_url, role, created_at FROM users ORDER BY name ASC');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users', authenticateToken, async (req, res) => {
+  const { name, username, password, avatar_url, role } = req.body;
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'Name, Username, and Password are required' });
+  }
+  try {
+    const existing = await dbGet('SELECT id FROM users WHERE username = ?', [username]);
+    if (existing) {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+    const result = await dbRun(
+      'INSERT INTO users (name, username, password, avatar_url, role) VALUES (?, ?, ?, ?, ?)',
+      [name, username, password, avatar_url || '', role || 'staff']
+    );
+    res.status(201).json({ id: result.id, name, username, avatar_url, role });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { name, username, password, avatar_url, role } = req.body;
+  if (!name || !username) {
+    return res.status(400).json({ error: 'Name and Username are required' });
+  }
+  try {
+    const existing = await dbGet('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
+    if (existing) {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+
+    if (password) {
+      await dbRun(
+        'UPDATE users SET name = ?, username = ?, password = ?, avatar_url = ?, role = ? WHERE id = ?',
+        [name, username, password, avatar_url || '', role || 'staff', id]
+      );
+    } else {
+      await dbRun(
+        'UPDATE users SET name = ?, username = ?, avatar_url = ?, role = ? WHERE id = ?',
+        [name, username, avatar_url || '', role || 'staff', id]
+      );
+    }
+    res.json({ id: parseInt(id), name, username, avatar_url, role });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  if (parseInt(id) === 1) {
+    return res.status(400).json({ error: 'Cannot delete primary admin user' });
+  }
+  try {
+    const user = await dbGet('SELECT username FROM users WHERE id = ?', [id]);
+    if (user && user.username === 'admin') {
+      return res.status(400).json({ error: 'Cannot delete primary admin user' });
+    }
+    await dbRun('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

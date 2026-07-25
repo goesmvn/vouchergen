@@ -41,6 +41,7 @@ const monthsLong = [
 let ticketCatalog = [];
 let invoiceCatalog = [];
 let agentsList = [];
+let usersList = [];
 let bookingQuantities = {};
 let selectedBookingDateString = '';
 let activeVoucherTemplate = 1; // 1=Classic, 2=Boarding Pass, 3=Minimal
@@ -101,6 +102,7 @@ async function loadAllData() {
   await loadInvoices();
   await loadPaymentMethods();
   await loadAgents();
+  await loadUsers();
   // Set default view tab
   switchTab(currentTab);
 }
@@ -144,13 +146,14 @@ function applyDynamicSettings() {
   if (generatorHeader) generatorHeader.innerText = appSettings.merchant_name;
 
   // Sidebar Admin profile
+  const currentUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
   const sidebarAvatarImg = document.getElementById('sidebar-avatar-img');
   if (sidebarAvatarImg) {
-    sidebarAvatarImg.src = appSettings.admin_avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
+    sidebarAvatarImg.src = currentUser.avatar_url || appSettings.admin_avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
   }
   const sidebarAvatarName = document.getElementById('sidebar-avatar-name');
   if (sidebarAvatarName) {
-    sidebarAvatarName.innerText = appSettings.admin_username || 'Super Admin';
+    sidebarAvatarName.innerText = currentUser.name || appSettings.admin_username || 'Super Admin';
   }
 
   // Render logo if configured
@@ -222,6 +225,9 @@ function setupEventListeners() {
 
       token = data.token;
       localStorage.setItem('admin_token', token);
+      if (data.user) {
+        localStorage.setItem('admin_user', JSON.stringify(data.user));
+      }
       errorEl.classList.add('hidden');
       showToast('Logged in successfully!');
       checkAuth();
@@ -340,15 +346,8 @@ function setupEventListeners() {
         service_fee: document.getElementById('settings-service-fee').value.trim(),
         discount_rate: document.getElementById('settings-discount-rate').value.trim(),
         discount_type: document.getElementById('settings-discount-type').value,
-        discount_label: document.getElementById('settings-discount-label').value.trim(),
-        admin_username: document.getElementById('settings-admin-username').value.trim(),
-        admin_avatar_url: document.getElementById('settings-admin-avatar').value.trim()
+        discount_label: document.getElementById('settings-discount-label').value.trim()
       };
-
-      const newPassword = document.getElementById('settings-admin-password').value;
-      if (newPassword) {
-        payload.admin_password = newPassword;
-      }
 
       try {
         showLoading(true, 'Saving Settings...', 'Updating system configurations...');
@@ -453,6 +452,7 @@ function setupEventListeners() {
 function logout() {
   token = null;
   localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_user');
   closeRedeemModal();
   closeNewIssueModal();
   closeModal();
@@ -495,7 +495,8 @@ function switchTab(tabId) {
       orders: 'Transaction logs & Status',
       settings: 'Place configuration & Branding',
       whatsapp: 'WhatsApp Chatbot Virtual Assistant',
-      agents: 'Agents Management Directory'
+      agents: 'Agents Management Directory',
+      users: 'User Account Management'
     };
     topPanelEl.innerText = titles[tabId] || 'Batur Hot Spring Admin';
   }
@@ -504,6 +505,7 @@ function switchTab(tabId) {
   if (tabId === 'dashboard') renderDashboardStats();
   if (tabId === 'store') renderStoreTicketsTable();
   if (tabId === 'agents') loadAgents();
+  if (tabId === 'users') loadUsers();
   if (tabId === 'generator') { renderBookingCatalog(); initVisitDateInput(); updateBookingTotal(); }
   if (tabId === 'invoices') renderInvoicesTable();
   if (tabId === 'vouchers') renderVouchersList();
@@ -1157,11 +1159,6 @@ function renderSettingsForm() {
   const discTypeEl = document.getElementById('settings-discount-type');
   if (discTypeEl) discTypeEl.value = appSettings.discount_type || 'percentage';
   document.getElementById('settings-discount-label').value = appSettings.discount_label || 'Diskon';
-  
-  // Admin credentials
-  document.getElementById('settings-admin-username').value = appSettings.admin_username || 'admin';
-  document.getElementById('settings-admin-password').value = '';
-  document.getElementById('settings-admin-avatar').value = appSettings.admin_avatar_url || '';
 }
 
 // Confirm Invoice payment
@@ -1745,6 +1742,193 @@ function printAgentContract(id) {
   // Show Details Modal
   const modal = document.getElementById('details-modal');
   if (modal) modal.classList.remove('hidden');
+}
+
+// Fetch Users List
+async function loadUsers() {
+  try {
+    const response = await fetch('/api/users', {
+      headers: { 'Authorization': token }
+    });
+    usersList = await response.json();
+    renderUsersTable();
+  } catch (err) {
+    console.error('Failed to load users:', err);
+  }
+}
+
+// Render Users Table
+function renderUsersTable() {
+  const tbody = document.getElementById('store-users-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (usersList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-secondary text-center py-4">No users registered.</td></tr>';
+    return;
+  }
+
+  // Get logged in user info to prevent self-deletion
+  const currentUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
+
+  usersList.forEach(user => {
+    const tr = document.createElement('tr');
+    tr.className = "border-b border-outline-variant hover:bg-surface-container-low transition-colors";
+    
+    const avatar = user.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
+    const isPrimaryAdmin = user.username === 'admin';
+    const isSelf = user.username === currentUser.username;
+
+    let deleteBtnHtml = `<button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteUser(${user.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>`;
+    if (isPrimaryAdmin || isSelf) {
+      deleteBtnHtml = `<button class="p-1.5 text-gray-300 cursor-not-allowed" disabled title="Cannot delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>`;
+    }
+
+    tr.innerHTML = `
+      <td class="py-3 px-4">
+        <img src="${avatar}" alt="${user.name}" class="w-8 h-8 rounded-full border border-outline-variant object-cover">
+      </td>
+      <td class="py-3 px-4 text-sm font-semibold text-on-surface">
+        <div>${user.name}</div>
+        <div class="text-[10px] text-on-surface-variant font-mono">ID: #${user.id}</div>
+      </td>
+      <td class="py-3 px-4 text-sm font-code-mono text-primary">${user.username}</td>
+      <td class="py-3 px-4 text-sm">
+        <span class="badge ${user.role === 'admin' ? 'badge-paid' : 'badge-unpaid'}">
+          ${user.role === 'admin' ? 'Admin' : 'Staff'}
+        </span>
+      </td>
+      <td class="py-3 px-4 text-sm space-x-2">
+        <button class="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-all" onclick="editUser(${user.id})" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+        ${deleteBtnHtml}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Reset User CRUD Form
+function resetUserForm() {
+  document.getElementById('store-user-id').value = '';
+  document.getElementById('store-user-name').value = '';
+  document.getElementById('store-user-username').value = '';
+  document.getElementById('store-user-password').value = '';
+  document.getElementById('store-user-avatar').value = '';
+  document.getElementById('store-user-role').value = 'staff';
+  document.getElementById('user-form-title').innerText = 'Create New User';
+  
+  // Reset password requirements
+  document.getElementById('store-user-password').required = true;
+  const hint = document.getElementById('user-password-hint');
+  if (hint) hint.classList.add('hidden');
+
+  const cancelBtn = document.getElementById('btn-cancel-user-edit');
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+// Save User CRUD Form
+async function saveUserForm(event) {
+  event.preventDefault();
+  const id = document.getElementById('store-user-id').value;
+  const name = document.getElementById('store-user-name').value.trim();
+  const username = document.getElementById('store-user-username').value.trim().toLowerCase();
+  const password = document.getElementById('store-user-password').value;
+  const avatar_url = document.getElementById('store-user-avatar').value.trim();
+  const role = document.getElementById('store-user-role').value;
+
+  const payload = { name, username, avatar_url, role };
+  if (password || !id) {
+    payload.password = password;
+  }
+
+  const url = id ? `/api/users/${id}` : '/api/users';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    showLoading(true, 'Saving User...', 'Submitting user profile...');
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to save user');
+
+    showToast(id ? 'User profile updated!' : 'User successfully registered!');
+    
+    // If we updated ourselves, refresh localStorage
+    const currentUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
+    if (id && parseInt(id) === currentUser.id) {
+      localStorage.setItem('admin_user', JSON.stringify({
+        id: currentUser.id,
+        name,
+        username,
+        avatar_url: avatar_url || currentUser.avatar_url,
+        role
+      }));
+      applyDynamicSettings();
+    }
+
+    resetUserForm();
+    await loadUsers();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Edit User Trigger
+function editUser(id) {
+  const user = usersList.find(u => u.id === id);
+  if (!user) return;
+
+  document.getElementById('store-user-id').value = user.id;
+  document.getElementById('store-user-name').value = user.name;
+  document.getElementById('store-user-username').value = user.username;
+  document.getElementById('store-user-password').value = '';
+  document.getElementById('store-user-avatar').value = user.avatar_url || '';
+  document.getElementById('store-user-role').value = user.role || 'staff';
+  
+  // Make password optional for editing
+  document.getElementById('store-user-password').required = false;
+  const hint = document.getElementById('user-password-hint');
+  if (hint) hint.classList.remove('hidden');
+
+  document.getElementById('user-form-title').innerText = 'Edit User Profile';
+  
+  const cancelBtn = document.getElementById('btn-cancel-user-edit');
+  if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+  // Scroll to form
+  document.getElementById('store-user-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Delete User Trigger
+async function deleteUser(id) {
+  if (!confirm('Are you sure you want to remove this user? This action cannot be undone.')) return;
+  try {
+    showLoading(true, 'Removing User...', 'Deleting user profile...');
+    const response = await fetch(`/api/users/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': token }
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to delete user');
+    }
+
+    showToast('User profile removed.');
+    await loadUsers();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    showLoading(false);
+  }
 }
 
 // Toggle Customer Type in Voucher Simulator checkout
