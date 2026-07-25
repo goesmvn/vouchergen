@@ -1486,6 +1486,7 @@ function resetAgentForm() {
   document.getElementById('store-agent-code').value = '';
   document.getElementById('store-agent-phone').value = '';
   document.getElementById('store-agent-email').value = '';
+  document.getElementById('store-agent-address').value = '';
   document.getElementById('store-agent-discount').value = '';
   const typeEl = document.getElementById('store-agent-discount-type');
   if (typeEl) typeEl.value = 'percentage';
@@ -1510,10 +1511,11 @@ async function saveAgentForm(event) {
 
   const phone = document.getElementById('store-agent-phone').value.trim();
   const email = document.getElementById('store-agent-email').value.trim();
+  const address = document.getElementById('store-agent-address').value.trim();
   const discount_rate = parseFloat(document.getElementById('store-agent-discount').value) || 0;
   const discount_type = document.getElementById('store-agent-discount-type')?.value || 'percentage';
 
-  const payload = { name, code, phone, email, discount_rate, discount_type };
+  const payload = { name, code, phone, email, discount_rate, discount_type, address };
   const url = id ? `/api/agents/${id}` : '/api/agents';
   const method = id ? 'PUT' : 'POST';
 
@@ -1551,6 +1553,7 @@ function editAgent(id) {
   document.getElementById('store-agent-code').value = agent.code;
   document.getElementById('store-agent-phone').value = agent.phone || '';
   document.getElementById('store-agent-email').value = agent.email || '';
+  document.getElementById('store-agent-address').value = agent.address || '';
   document.getElementById('store-agent-discount').value = agent.discount_rate || 0;
   const typeEl = document.getElementById('store-agent-discount-type');
   if (typeEl) typeEl.value = agent.discount_type || 'percentage';
@@ -1686,6 +1689,7 @@ function printAgentContract(id) {
           <p class="text-xs">Kode Agen Unik: <span class="font-code-mono font-bold text-primary">${agent.code}</span></p>
           <p class="text-xs">Nomor Telepon: ${agent.phone || '-'}</p>
           <p class="text-xs">Email: ${agent.email || '-'}</p>
+          <p class="text-xs">Alamat: ${agent.address || '—'}</p>
         </div>
         
         <p>Kedua belah pihak sepakat untuk melakukan hubungan kerjasama penjualan tiket masuk dengan ketentuan tarif khusus (Contract Rate) sebagai berikut:</p>
