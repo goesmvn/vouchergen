@@ -1069,6 +1069,7 @@ function renderAgentsTable() {
       <td class="py-3 px-4 text-sm text-on-surface-variant">${agent.phone || '-'}</td>
       <td class="py-3 px-4 text-sm font-semibold text-emerald-600">${agent.discount_rate}%</td>
       <td class="py-3 px-4 text-sm space-x-2">
+        <button class="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-all" onclick="printAgentContract(${agent.id})" title="Print Contract"><span class="material-symbols-outlined text-[18px]">description</span></button>
         <button class="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-all" onclick="editAgent(${agent.id})" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>
         <button class="p-1.5 text-error hover:bg-error/10 rounded-lg transition-all" onclick="deleteAgent(${agent.id})" title="Delete"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       </td>
@@ -1231,6 +1232,166 @@ async function deleteAgent(id) {
   } finally {
     showLoading(false);
   }
+}
+
+// Print Agent Contract Rate Agreement
+function printAgentContract(id) {
+  const agent = agentsList.find(a => a.id === id);
+  if (!agent) {
+    showToast('Agent not found', true);
+    return;
+  }
+
+  const modalBody = document.getElementById('modal-body-container');
+  if (!modalBody) return;
+
+  // Set print title
+  const safeName = agent.name.replace(/[^a-zA-Z0-9- ]/g, '_').trim();
+  window.currentPrintTitle = `Kontrak_Rate_${agent.code}_${safeName}`;
+
+  // Hide unnecessary modal buttons, show print button
+  const payBtn = document.getElementById('modal-pay-btn');
+  const viewVchBtn = document.getElementById('modal-view-vch-btn');
+  const editBtn = document.getElementById('modal-edit-btn');
+  const deleteBtn = document.getElementById('modal-delete-btn');
+  const pdfBtn = document.getElementById('modal-download-pdf-btn');
+
+  if (payBtn) payBtn.classList.add('hidden');
+  if (viewVchBtn) viewVchBtn.classList.add('hidden');
+  if (editBtn) editBtn.classList.add('hidden');
+  if (deleteBtn) deleteBtn.classList.add('hidden');
+  if (pdfBtn) pdfBtn.classList.add('hidden');
+
+  // Change header title
+  const headerTitle = document.querySelector('.modal-action-row h3');
+  if (headerTitle) headerTitle.innerText = `Agent Contract: ${agent.name}`;
+
+  // Generate ticket prices table
+  const activeTickets = ticketCatalog.filter(t => t.is_active === 1);
+  let ticketRowsHtml = '';
+  
+  if (activeTickets.length === 0) {
+    ticketRowsHtml = `<tr><td colspan="4" class="text-center py-4 border border-gray-300 text-gray-500">No active ticket categories.</td></tr>`;
+  } else {
+    activeTickets.forEach(ticket => {
+      // Calculate agent net price (base price minus agent discount)
+      const publishPrice = ticket.price;
+      const discountAmt = Math.round(publishPrice * agent.discount_rate / 100);
+      const netPrice = Math.max(0, publishPrice - discountAmt);
+
+      ticketRowsHtml += `
+        <tr class="border-b border-gray-200">
+          <td class="py-3 px-4 text-sm font-semibold text-gray-800 border border-gray-300">${ticket.title}</td>
+          <td class="py-3 px-4 text-sm text-right text-gray-700 font-mono border border-gray-300">Rp ${publishPrice.toLocaleString('id-ID')}</td>
+          <td class="py-3 px-4 text-sm text-center text-emerald-600 font-bold border border-gray-300">${agent.discount_rate}%</td>
+          <td class="py-3 px-4 text-sm text-right text-primary font-bold font-mono border border-gray-300">Rp ${netPrice.toLocaleString('id-ID')}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const currentDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Generate contract HTML template
+  modalBody.innerHTML = `
+    <div class="contract-container max-w-4xl mx-auto bg-white p-8 md:p-12 text-gray-800 shadow-sm border border-gray-200 rounded-xl relative">
+      <!-- Kop Surat -->
+      <div class="flex items-center gap-6 border-b-4 border-double border-gray-800 pb-6 mb-8 flex-col md:flex-row text-center md:text-left">
+        <img src="${appSettings.merchant_logo_url || ''}" alt="Logo" class="h-16 object-contain bg-white p-1 border border-gray-300 rounded max-w-[120px]">
+        <div class="flex-1">
+          <h2 class="text-xl font-bold uppercase text-gray-900 tracking-wide">${appSettings.merchant_name || 'BATUR NATURAL HOT SPRING'}</h2>
+          <p class="text-xs text-gray-500 mt-1">${appSettings.merchant_address || ''}</p>
+          <p class="text-xs text-gray-500">${appSettings.merchant_email || ''} | ${appSettings.merchant_phone || ''}</p>
+        </div>
+      </div>
+
+      <!-- Judul Surat -->
+      <div class="text-center mb-8">
+        <h1 class="text-lg md:text-xl font-extrabold uppercase text-gray-950 underline tracking-wider">SURAT PERJANJIAN & KONTRAK RATE AGEN</h1>
+        <p class="text-xs text-gray-500 mt-1 font-mono">No: ${agent.code}/AGR-${new Date().getFullYear()}/${Date.now().toString().slice(-4)}</p>
+      </div>
+
+      <!-- Pembukaan Perjanjian -->
+      <div class="text-sm leading-relaxed mb-6 space-y-3">
+        <p>Pada hari ini, tanggal <strong>${currentDate}</strong>, yang bertanda tangan di bawah ini sepakat mengadakan perjanjian kerjasama penjualan tiket masuk antara:</p>
+        
+        <div class="pl-4 border-l-2 border-primary space-y-1 my-3 bg-gray-50 p-3 rounded">
+          <p class="font-bold text-gray-900">PIHAK PERTAMA (Penyedia Layanan / Merchant):</p>
+          <p class="text-xs">Nama Perusahaan: <strong class="text-primary">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</strong></p>
+          <p class="text-xs">Alamat: ${appSettings.merchant_address || 'Toya Bungkah, Kintamani, Bali'}</p>
+        </div>
+
+        <div class="pl-4 border-l-2 border-secondary space-y-1 my-3 bg-gray-50 p-3 rounded">
+          <p class="font-bold text-gray-900">PIHAK KEDUA (Mitra Agen / Company):</p>
+          <p class="text-xs">Nama Agen / Instansi: <strong>${agent.name}</strong></p>
+          <p class="text-xs">Kode Agen Unik: <span class="font-code-mono font-bold text-primary">${agent.code}</span></p>
+          <p class="text-xs">Nomor Telepon: ${agent.phone || '-'}</p>
+          <p class="text-xs">Email: ${agent.email || '-'}</p>
+        </div>
+        
+        <p>Kedua belah pihak sepakat untuk melakukan hubungan kerjasama penjualan tiket masuk dengan ketentuan tarif khusus (Contract Rate) sebagai berikut:</p>
+      </div>
+
+      <!-- Ketentuan Perjanjian -->
+      <div class="space-y-4 mb-8">
+        <div>
+          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 1: KETENTUAN DISKON AGEN</h4>
+          <p class="text-xs leading-relaxed text-gray-650">PIHAK PERTAMA memberikan diskon khusus keagenan (Contract Rate) sebesar <strong class="text-emerald-600">${agent.discount_rate}%</strong> (persen) dari harga publik yang berlaku. Potongan ini akan langsung diaplikasikan di setiap pemesanan tiket masuk menggunakan kode agen resmi PIHAK KEDUA.</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 2: DAFTAR TARIF KONTRAK (CONTRACT RATE TABLE)</h4>
+          <div class="overflow-x-auto mt-2">
+            <table class="w-full text-left border-collapse border border-gray-300">
+              <thead>
+                <tr class="bg-gray-150 border-b border-gray-300">
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-gray-700 border border-gray-300 w-2/5">Kategori Tiket / Voucher</th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-right text-gray-700 border border-gray-300">Harga Publik (Publish)</th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-center text-gray-700 border border-gray-300">Diskon Agen</th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-right text-primary border border-gray-300">Harga Kontrak Agen (Net)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${ticketRowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 3: VALIDITAS & SYARAT</h4>
+          <p class="text-xs leading-relaxed text-gray-650">Tarif kontrak di atas berlaku sejak tanggal ditandatanganinya perjanjian ini dan akan terus ditinjau kembali secara berkala sesuai ketentuan tarif publik PIHAK PERTAMA. Tiket yang dibeli tidak dapat ditransfer atau di-refund secara sepihak kecuali ditentukan lain dalam kesepakatan.</p>
+        </div>
+      </div>
+
+      <!-- Blok Tanda Tangan -->
+      <div class="grid grid-cols-2 gap-8 text-center pt-8 border-t border-dashed border-gray-300 text-sm mt-12 break-inside-avoid">
+        <div>
+          <p class="font-semibold text-gray-800">PIHAK KEDUA (Mitra Agen)</p>
+          <p class="text-xs text-gray-400 mt-0.5">Selaku Pihak yang Menerima Tarif Kontrak</p>
+          <div class="h-20 flex items-center justify-center">
+            <span class="text-xs text-gray-300 italic border border-dashed p-1 rounded border-gray-300">Materai / Stamp</span>
+          </div>
+          <p class="font-bold text-gray-900 underline">${agent.name}</p>
+          <p class="text-xs text-gray-500 font-mono">${agent.code}</p>
+        </div>
+        
+        <div>
+          <p class="font-semibold text-gray-800">PIHAK PERTAMA (Penyedia Layanan)</p>
+          <p class="text-xs text-gray-400 mt-0.5">Selaku Pihak yang Memberikan Tarif Kontrak</p>
+          <div class="h-20 flex items-center justify-center">
+            <span class="text-[10px] text-emerald-600/60 font-black border border-emerald-500/20 px-2 py-1 bg-emerald-50/50 rounded uppercase tracking-widest font-mono">AUTHORIZED STAMP</span>
+          </div>
+          <p class="font-bold text-gray-900 underline">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</p>
+          <p class="text-xs text-gray-500">Authorized Manager</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Show Details Modal
+  const modal = document.getElementById('details-modal');
+  if (modal) modal.classList.remove('hidden');
 }
 
 // Toggle Customer Type in Voucher Simulator checkout
