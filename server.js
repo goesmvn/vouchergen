@@ -143,9 +143,18 @@ async function initializeDatabase() {
         phone TEXT,
         email TEXT,
         discount_rate REAL DEFAULT 0,
+        discount_type TEXT DEFAULT 'percentage',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Safe migration: Add discount_type to agents table if it doesn't exist
+    try {
+      await dbRun("ALTER TABLE agents ADD COLUMN discount_type TEXT DEFAULT 'percentage'");
+      console.log("Added discount_type column to agents.");
+    } catch (e) {
+      // ignore
+    }
 
     // Redemptions Table (to track double scanning)
     await dbRun(`
@@ -894,7 +903,7 @@ app.get('/api/agents', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/agents', authenticateToken, async (req, res) => {
-  const { name, code, phone, email, discount_rate } = req.body;
+  const { name, code, phone, email, discount_rate, discount_type } = req.body;
   if (!name || !code) {
     return res.status(400).json({ error: 'Name and Code are required' });
   }
@@ -903,11 +912,12 @@ app.post('/api/agents', authenticateToken, async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Agent code must be unique' });
     }
+    const discType = discount_type || 'percentage';
     const result = await dbRun(
-      'INSERT INTO agents (name, code, phone, email, discount_rate) VALUES (?, ?, ?, ?, ?)',
-      [name, code, phone || '', email || '', parseFloat(discount_rate) || 0]
+      'INSERT INTO agents (name, code, phone, email, discount_rate, discount_type) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, code, phone || '', email || '', parseFloat(discount_rate) || 0, discType]
     );
-    res.status(201).json({ id: result.id, name, code, phone, email, discount_rate });
+    res.status(201).json({ id: result.id, name, code, phone, email, discount_rate, discount_type: discType });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -915,7 +925,7 @@ app.post('/api/agents', authenticateToken, async (req, res) => {
 
 app.put('/api/agents/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { name, code, phone, email, discount_rate } = req.body;
+  const { name, code, phone, email, discount_rate, discount_type } = req.body;
   if (!name || !code) {
     return res.status(400).json({ error: 'Name and Code are required' });
   }
@@ -924,11 +934,12 @@ app.put('/api/agents/:id', authenticateToken, async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Agent code must be unique' });
     }
+    const discType = discount_type || 'percentage';
     await dbRun(
-      'UPDATE agents SET name = ?, code = ?, phone = ?, email = ?, discount_rate = ? WHERE id = ?',
-      [name, code, phone || '', email || '', parseFloat(discount_rate) || 0, id]
+      'UPDATE agents SET name = ?, code = ?, phone = ?, email = ?, discount_rate = ?, discount_type = ? WHERE id = ?',
+      [name, code, phone || '', email || '', parseFloat(discount_rate) || 0, discType, id]
     );
-    res.json({ id: parseInt(id), name, code, phone, email, discount_rate });
+    res.json({ id: parseInt(id), name, code, phone, email, discount_rate, discount_type: discType });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

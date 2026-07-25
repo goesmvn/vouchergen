@@ -1091,6 +1091,10 @@ function renderAgentsTable() {
   }
 
   agentsList.forEach(agent => {
+    const discDisplay = agent.discount_type === 'nominal' 
+      ? `Rp ${agent.discount_rate.toLocaleString('id-ID')}` 
+      : `${agent.discount_rate}%`;
+
     const tr = document.createElement('tr');
     tr.className = "border-b border-outline-variant hover:bg-surface-container-low transition-colors";
     tr.innerHTML = `
@@ -1100,7 +1104,7 @@ function renderAgentsTable() {
         <div class="text-xs text-on-surface-variant">${agent.email || '-'}</div>
       </td>
       <td class="py-3 px-4 text-sm text-on-surface-variant">${agent.phone || '-'}</td>
-      <td class="py-3 px-4 text-sm font-semibold text-emerald-600">${agent.discount_rate}%</td>
+      <td class="py-3 px-4 text-sm font-semibold text-emerald-600">${discDisplay}</td>
       <td class="py-3 px-4 text-sm space-x-2">
         <button class="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-all" onclick="printAgentContract(${agent.id})" title="Print Contract"><span class="material-symbols-outlined text-[18px]">description</span></button>
         <button class="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-all" onclick="editAgent(${agent.id})" title="Edit"><span class="material-symbols-outlined text-[18px]">edit</span></button>
@@ -1122,7 +1126,10 @@ function populateAgentSelect() {
   agentsList.forEach(agent => {
     const opt = document.createElement('option');
     opt.value = agent.id;
-    opt.innerText = `${agent.name} (${agent.code}) — ${agent.discount_rate}%`;
+    const discLabel = agent.discount_type === 'nominal' 
+      ? `Rp ${agent.discount_rate.toLocaleString('id-ID')}` 
+      : `${agent.discount_rate}%`;
+    opt.innerText = `${agent.name} (${agent.code}) — ${discLabel}`;
     select.appendChild(opt);
   });
 }
@@ -1182,6 +1189,8 @@ function resetAgentForm() {
   document.getElementById('store-agent-phone').value = '';
   document.getElementById('store-agent-email').value = '';
   document.getElementById('store-agent-discount').value = '';
+  const typeEl = document.getElementById('store-agent-discount-type');
+  if (typeEl) typeEl.value = 'percentage';
   document.getElementById('agent-form-title').innerText = 'Register New Agent';
   
   const cancelBtn = document.getElementById('btn-cancel-agent-edit');
@@ -1193,12 +1202,20 @@ async function saveAgentForm(event) {
   event.preventDefault();
   const id = document.getElementById('store-agent-id').value;
   const name = document.getElementById('store-agent-name').value.trim();
-  const code = document.getElementById('store-agent-code').value.trim().toUpperCase();
+  let code = document.getElementById('store-agent-code').value.trim().toUpperCase();
+  
+  // Dynamic Agent Code generation if empty
+  if (!code) {
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    code = `AGT-${randNum}`;
+  }
+
   const phone = document.getElementById('store-agent-phone').value.trim();
   const email = document.getElementById('store-agent-email').value.trim();
   const discount_rate = parseFloat(document.getElementById('store-agent-discount').value) || 0;
+  const discount_type = document.getElementById('store-agent-discount-type')?.value || 'percentage';
 
-  const payload = { name, code, phone, email, discount_rate };
+  const payload = { name, code, phone, email, discount_rate, discount_type };
   const url = id ? `/api/agents/${id}` : '/api/agents';
   const method = id ? 'PUT' : 'POST';
 
@@ -1237,6 +1254,8 @@ function editAgent(id) {
   document.getElementById('store-agent-phone').value = agent.phone || '';
   document.getElementById('store-agent-email').value = agent.email || '';
   document.getElementById('store-agent-discount').value = agent.discount_rate || 0;
+  const typeEl = document.getElementById('store-agent-discount-type');
+  if (typeEl) typeEl.value = agent.discount_type || 'percentage';
   
   document.getElementById('agent-form-title').innerText = 'Edit Agent Profile';
   
@@ -1309,14 +1328,23 @@ function printAgentContract(id) {
     activeTickets.forEach(ticket => {
       // Calculate agent net price (base price minus agent discount)
       const publishPrice = ticket.price;
-      const discountAmt = Math.round(publishPrice * agent.discount_rate / 100);
-      const netPrice = Math.max(0, publishPrice - discountAmt);
+      let netPrice = publishPrice;
+      let discountLabelText = '';
+      
+      if (agent.discount_type === 'nominal') {
+        netPrice = Math.max(0, publishPrice - agent.discount_rate);
+        discountLabelText = `Rp ${agent.discount_rate.toLocaleString('id-ID')}`;
+      } else {
+        const discountAmt = Math.round(publishPrice * agent.discount_rate / 100);
+        netPrice = Math.max(0, publishPrice - discountAmt);
+        discountLabelText = `${agent.discount_rate}%`;
+      }
 
       ticketRowsHtml += `
         <tr class="border-b border-gray-200">
           <td class="py-3 px-4 text-sm font-semibold text-gray-800 border border-gray-300">${ticket.title}</td>
           <td class="py-3 px-4 text-sm text-right text-gray-700 font-mono border border-gray-300">Rp ${publishPrice.toLocaleString('id-ID')}</td>
-          <td class="py-3 px-4 text-sm text-center text-emerald-600 font-bold border border-gray-300">${agent.discount_rate}%</td>
+          <td class="py-3 px-4 text-sm text-center text-emerald-600 font-bold border border-gray-300">${discountLabelText}</td>
           <td class="py-3 px-4 text-sm text-right text-primary font-bold font-mono border border-gray-300">Rp ${netPrice.toLocaleString('id-ID')}</td>
         </tr>
       `;
@@ -1472,7 +1500,7 @@ window.onAgentSelected = function() {
         discInput.disabled = true;
       }
       if (typeEl) {
-        typeEl.value = 'percentage';
+        typeEl.value = agent.discount_type || 'percentage';
         typeEl.disabled = true;
       }
       if (labelEl) {
