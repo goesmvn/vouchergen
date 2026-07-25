@@ -7,6 +7,8 @@
   <title>Batur Hot Spring & GreenLeaf Park Voucher Admin</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Google Fonts & Material Symbols -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1000,6 +1002,54 @@
               <div>
                 <p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Redeemed Vouchers</p>
                 <h3 id="stat-total-redeemed" class="font-headline-lg text-headline-lg text-primary mt-1">0</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sales Chart & Leaderboard Section -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+            <!-- Left: Sales Chart -->
+            <div class="lg:col-span-2 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between">
+              <div class="flex justify-between items-center mb-4">
+                <div>
+                  <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Grafik Penjualan</h3>
+                  <p class="text-xs text-on-surface-variant">Sebaran statistik pendapatan harian / bulanan</p>
+                </div>
+                <div class="flex bg-surface-container-low p-1 rounded-lg border border-outline-variant">
+                  <button id="chart-btn-daily" onclick="switchChartScale('daily')" class="px-3 py-1.5 rounded-md text-xs font-bold bg-primary text-on-primary shadow-sm transition-all">Harian</button>
+                  <button id="chart-btn-monthly" onclick="switchChartScale('monthly')" class="px-3 py-1.5 rounded-md text-xs font-bold text-on-surface-variant hover:text-on-surface transition-all">Bulanan</button>
+                </div>
+              </div>
+              <div class="relative w-full" style="height: 250px;">
+                <canvas id="salesChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Right: Leaderboards (Top Agents & Top Tickets) -->
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between">
+              <div>
+                <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface mb-1">Top Performing</h3>
+                <p class="text-xs text-on-surface-variant mb-4">Ringkasan agen & tiket terlaris</p>
+                
+                <!-- Top Agents -->
+                <div class="space-y-3 mb-6">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-primary border-b border-outline-variant pb-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">group</span> Agen Pembelian Terbanyak
+                  </h4>
+                  <div id="dashboard-top-agents" class="space-y-2">
+                    <!-- Rendered dynamically -->
+                  </div>
+                </div>
+
+                <!-- Top Tickets -->
+                <div class="space-y-3">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-secondary border-b border-outline-variant pb-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">confirmation_number</span> Tiket Paling Laris
+                  </h4>
+                  <div id="dashboard-top-tickets" class="space-y-2">
+                    <!-- Rendered dynamically -->
+                  </div>
+                </div>
               </div>
             </div>
           </div>

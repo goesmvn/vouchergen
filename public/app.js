@@ -44,6 +44,8 @@ let agentsList = [];
 let bookingQuantities = {};
 let selectedBookingDateString = '';
 let activeVoucherTemplate = 1; // 1=Classic, 2=Boarding Pass, 3=Minimal
+let mySalesChart = null;
+let currentChartScale = 'daily';
 
 
 // Default Unsplash banners for ticket cards
@@ -698,38 +700,285 @@ function renderDashboardStats() {
 
   // Render recent activities (last 5 rows)
   const tbody = document.getElementById('dashboard-recent-body');
-  tbody.innerHTML = '';
-  
-  const recents = invoiceCatalog.slice(0, 5);
-  if (recents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-secondary text-center">No recent activities available.</td></tr>';
-    return;
+  if (tbody) {
+    tbody.innerHTML = '';
+    const recents = invoiceCatalog.slice(0, 5);
+    if (recents.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-secondary text-center">No recent activities available.</td></tr>';
+    } else {
+      recents.forEach(inv => {
+        const isPaid = inv.current_status === 'Paid';
+        const isRedeemed = inv.current_status === 'Redeemed';
+        const isDP = inv.current_status === 'DP';
+        let badge = `<span class="badge badge-unpaid">Unpaid</span>`;
+        if (isRedeemed) badge = `<span class="badge badge-redeemed">Redeemed</span>`;
+        else if (isPaid) badge = `<span class="badge badge-paid">Paid</span>`;
+        else if (isDP) badge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP</span>`;
+
+        const items = inv.items || [];
+        const firstItem = items[0] || { ticket_title: '-' };
+        const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>#${inv.id}</td>
+          <td><strong>${inv.customer_name}</strong></td>
+          <td>${descText}</td>
+          <td>${badge}</td>
+          <td>${new Date(inv.created_at).toLocaleDateString('id-ID')}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
   }
 
-  recents.forEach(inv => {
-    const isPaid = inv.current_status === 'Paid';
-    const isRedeemed = inv.current_status === 'Redeemed';
-    const isDP = inv.current_status === 'DP';
-    let badge = `<span class="badge badge-unpaid">Unpaid</span>`;
-    if (isRedeemed) badge = `<span class="badge badge-redeemed">Redeemed</span>`;
-    else if (isPaid) badge = `<span class="badge badge-paid">Paid</span>`;
-    else if (isDP) badge = `<span class="badge" style="background:#fff3cd;color:#856404;">DP</span>`;
+  // Calculate & Render Top Agents in Dashboard
+  const topAgentsContainer = document.getElementById('dashboard-top-agents');
+  if (topAgentsContainer) {
+    topAgentsContainer.innerHTML = '';
+    const agentSalesMap = {};
+    
+    // Initialize map
+    agentsList.forEach(a => {
+      agentSalesMap[a.id] = { name: a.name, code: a.code, spend: 0, orders: 0 };
+    });
 
-    const items = inv.items || [];
-    const firstItem = items[0] || { ticket_title: '-' };
-    const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
+    // Populate stats
+    invoiceCatalog.filter(i => (i.current_status === 'Paid' || i.current_status === 'Redeemed') && i.agent_id).forEach(inv => {
+      if (agentSalesMap[inv.agent_id]) {
+        agentSalesMap[inv.agent_id].spend += inv.total_price;
+        agentSalesMap[inv.agent_id].orders++;
+      }
+    });
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>#${inv.id}</td>
-      <td><strong>${inv.customer_name}</strong></td>
-      <td>${descText}</td>
-      <td>${badge}</td>
-      <td>${new Date(inv.created_at).toLocaleDateString('id-ID')}</td>
-    `;
-    tbody.appendChild(tr);
+    const sortedAgents = Object.values(agentSalesMap).sort((a, b) => b.spend - a.spend).slice(0, 3);
+    if (sortedAgents.length === 0 || sortedAgents.every(a => a.spend === 0)) {
+      topAgentsContainer.innerHTML = '<p class="text-xs text-on-surface-variant italic text-center py-2">Belum ada transaksi agen</p>';
+    } else {
+      sortedAgents.forEach((a, idx) => {
+        if (a.spend > 0) {
+          const item = document.createElement('div');
+          item.className = "flex items-center justify-between p-2.5 bg-surface-container-low rounded-lg border border-outline-variant text-xs";
+          item.innerHTML = `
+            <div class="truncate max-w-[140px]">
+              <span class="font-bold text-on-surface">${idx+1}. ${a.name}</span>
+              <div class="text-[10px] text-on-surface-variant font-mono">${a.code}</div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-primary">Rp ${a.spend.toLocaleString('id-ID')}</div>
+              <div class="text-[10px] text-on-surface-variant">${a.orders} Pesanan</div>
+            </div>
+          `;
+          topAgentsContainer.appendChild(item);
+        }
+      });
+    }
+  }
+
+  // Calculate & Render Top Tickets (Laris)
+  const topTicketsContainer = document.getElementById('dashboard-top-tickets');
+  if (topTicketsContainer) {
+    topTicketsContainer.innerHTML = '';
+    const ticketSalesMap = {};
+
+    // Populate stats from paid / redeemed invoices
+    invoiceCatalog.filter(i => i.current_status === 'Paid' || i.current_status === 'Redeemed').forEach(inv => {
+      const items = inv.items || [];
+      items.forEach(item => {
+        const title = item.ticket_title || 'Admission';
+        if (!ticketSalesMap[title]) {
+          ticketSalesMap[title] = { title, qty: 0, revenue: 0 };
+        }
+        ticketSalesMap[title].qty += item.quantity || 0;
+        ticketSalesMap[title].revenue += item.total_price || 0;
+      });
+    });
+
+    const sortedTickets = Object.values(ticketSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 3);
+    if (sortedTickets.length === 0) {
+      topTicketsContainer.innerHTML = '<p class="text-xs text-on-surface-variant italic text-center py-2">Belum ada tiket terjual</p>';
+    } else {
+      sortedTickets.forEach((t, idx) => {
+        const item = document.createElement('div');
+        item.className = "flex items-center justify-between p-2.5 bg-surface-container-low rounded-lg border border-outline-variant text-xs";
+        item.innerHTML = `
+          <div class="truncate max-w-[140px]" title="${t.title}">
+            <span class="font-bold text-on-surface">${idx+1}. ${t.title}</span>
+          </div>
+          <div class="text-right">
+            <div class="font-bold text-secondary">${t.qty} Terjual</div>
+            <div class="text-[10px] text-on-surface-variant">Rp ${t.revenue.toLocaleString('id-ID')}</div>
+          </div>
+        `;
+        topTicketsContainer.appendChild(item);
+      });
+    }
+  }
+
+  // Render sales chart
+  setTimeout(() => renderSalesChart(), 100);
+}
+
+// Render Sales Chart using Chart.js
+function renderSalesChart() {
+  const ctx = document.getElementById('salesChart');
+  if (!ctx) return;
+
+  if (mySalesChart) {
+    mySalesChart.destroy();
+  }
+
+  const paidInvoices = invoiceCatalog.filter(i => i.current_status === 'Paid' || i.current_status === 'Redeemed');
+
+  let labels = [];
+  let dataPoints = [];
+
+  if (currentChartScale === 'daily') {
+    // Last 7 days chart labels & stats
+    const dailyMap = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+      const dbKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      dailyMap[dbKey] = { label: dateStr, revenue: 0 };
+    }
+
+    paidInvoices.forEach(inv => {
+      // created_at is YYYY-MM-DD HH:MM:SS
+      const dbKey = inv.created_at.split(' ')[0];
+      if (dailyMap[dbKey]) {
+        dailyMap[dbKey].revenue += inv.total_price;
+      }
+    });
+
+    Object.keys(dailyMap).sort().forEach(k => {
+      labels.push(dailyMap[k].label);
+      dataPoints.push(dailyMap[k].revenue);
+    });
+
+  } else {
+    // Monthly chart labels & stats
+    const monthlyMap = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthStr = d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      const dbKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
+      monthlyMap[dbKey] = { label: monthStr, revenue: 0 };
+    }
+
+    paidInvoices.forEach(inv => {
+      const dateParts = inv.created_at.split(' ')[0].split('-');
+      if (dateParts.length >= 2) {
+        const dbKey = `${dateParts[0]}-${dateParts[1]}`;
+        if (monthlyMap[dbKey]) {
+          monthlyMap[dbKey].revenue += inv.total_price;
+        }
+      }
+    });
+
+    Object.keys(monthlyMap).sort().forEach(k => {
+      labels.push(monthlyMap[k].label);
+      dataPoints.push(monthlyMap[k].revenue);
+    });
+  }
+
+  // Get primary theme color
+  const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#000000';
+
+  mySalesChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Pendapatan (Rp)',
+        data: dataPoints,
+        borderColor: primaryColor,
+        backgroundColor: `${primaryColor}15`, // primary color with transparency
+        borderWidth: 3,
+        fill: true,
+        tension: 0.35,
+        pointBackgroundColor: primaryColor,
+        pointHoverRadius: 6,
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` Pendapatan: Rp ${context.raw.toLocaleString('id-ID')}`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              if (value >= 1000000) {
+                return 'Rp ' + (value / 1000000) + 'jt';
+              } else if (value >= 1000) {
+                return 'Rp ' + (value / 1000) + 'k';
+              }
+              return 'Rp ' + value;
+            },
+            font: {
+              size: 10
+            }
+          },
+          grid: {
+            color: '#F1F5F9'
+          }
+        },
+        x: {
+          ticks: {
+            font: {
+              size: 10
+            }
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
+    }
   });
 }
+
+// Switch sales chart scale between daily and monthly
+window.switchChartScale = function(scale) {
+  currentChartScale = scale;
+  
+  const dailyBtn = document.getElementById('chart-btn-daily');
+  const monthlyBtn = document.getElementById('chart-btn-monthly');
+
+  if (scale === 'daily') {
+    if (dailyBtn) {
+      dailyBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold bg-primary text-on-primary shadow-sm transition-all";
+    }
+    if (monthlyBtn) {
+      monthlyBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold text-on-surface-variant hover:text-on-surface transition-all";
+    }
+  } else {
+    if (dailyBtn) {
+      dailyBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold text-on-surface-variant hover:text-on-surface transition-all";
+    }
+    if (monthlyBtn) {
+      monthlyBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold bg-primary text-on-primary shadow-sm transition-all";
+    }
+  }
+
+  renderSalesChart();
+};
 
 // Orders table list
 function renderOrdersTable() {
