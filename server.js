@@ -218,7 +218,10 @@ async function initializeDatabase() {
       { key: 'tax_rate', value: '0' },
       { key: 'service_fee', value: '0' },
       { key: 'discount_rate', value: '0' },
-      { key: 'discount_label', value: 'Diskon' }
+      { key: 'discount_label', value: 'Diskon' },
+      { key: 'admin_username', value: 'admin' },
+      { key: 'admin_password', value: 'admin123' },
+      { key: 'admin_avatar_url', value: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80' }
     ];
 
     for (const setting of defaultSettings) {
@@ -308,16 +311,25 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // Auth endpoint
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  console.log(`Login attempt: username="${username}", password="${password}"`);
-  // Simple credential verification
-  if (username === 'admin' && password === 'admin123') {
-    console.log('Login successful');
-    res.json({ token: 'admin-secret-token', role: 'admin' });
-  } else {
-    console.log(`Login failed: username match=${username === 'admin'}, password match=${password === 'admin123'}`);
-    res.status(400).json({ error: 'Invalid username or password' });
+  console.log(`Login attempt: username="${username}"`);
+  try {
+    const dbUser = await dbGet("SELECT value FROM settings WHERE key = 'admin_username'");
+    const dbPass = await dbGet("SELECT value FROM settings WHERE key = 'admin_password'");
+    
+    const validUser = (dbUser ? dbUser.value : 'admin');
+    const validPass = (dbPass ? dbPass.value : 'admin123');
+
+    if (username === validUser && password === validPass) {
+      console.log('Login successful');
+      res.json({ token: 'admin-secret-token', role: 'admin' });
+    } else {
+      console.log('Login failed');
+      res.status(400).json({ error: 'Invalid username or password' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

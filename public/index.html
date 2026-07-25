@@ -756,7 +756,7 @@
         <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-on-primary">
           <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">park</span>
         </div>
-        <h2 class="font-headline-sm text-headline-sm font-extrabold text-primary">GreenLeaf Park</h2>
+        <h2 id="login-branding-title" class="font-headline-sm text-headline-sm font-extrabold text-primary">GreenLeaf Park</h2>
       </div>
       <p class="text-body-md text-on-surface-variant">Sign in to voucher administration portal</p>
     </div>
@@ -875,9 +875,9 @@
 
       <div class="pt-lg border-t border-outline-variant mt-auto space-y-md">
         <div class="flex items-center gap-sm px-sm cursor-pointer hover:opacity-80 transition-opacity" onclick="switchTab('settings')">
-          <img class="w-10 h-10 rounded-full border border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvxxdi8uSzmI8IHFC6micb26580j9NsqUWrLYNvxjKTc-YIQnTdNvvxgaJqFYChMh-xG4sbmA_7mZ8tZbnSSQB6yseahRAF1SvuLB0aRNJShhPdQRj1Kh7pphgsG5xNK92AiYPnCXgPvvDB0eXg3Y545BJML6zvArctjkbC4b5GbSv1YOUTkuopd5EDEv9YlYiGEPIZKITCUCBqTlIhXg42gfewDvsaelCTXDI798Piqij-bDOAYu4CAu8KeibxC-88zePXyujH7b3">
+          <img id="sidebar-avatar-img" class="w-10 h-10 rounded-full border border-outline-variant object-cover" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80">
           <div class="overflow-hidden">
-            <p class="font-label-md text-label-md text-on-surface truncate">Super Admin</p>
+            <p id="sidebar-avatar-name" class="font-label-md text-label-md text-on-surface truncate">Super Admin</p>
             <p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Super Administrator</p>
           </div>
         </div>
@@ -1163,7 +1163,7 @@
                     <span class="material-symbols-outlined text-[32px]">forest</span>
                   </div>
                   <div class="relative z-10">
-                    <h3 class="font-headline-sm text-lg font-bold">Batur Hot Spring &amp; GreenLeaf Park</h3>
+                    <h3 id="generator-branding-title" class="font-headline-sm text-lg font-bold">Batur Hot Spring &amp; GreenLeaf Park</h3>
                     <p class="text-xs opacity-90 mt-0.5">Select visit date and ticket categories below.</p>
                   </div>
                 </div>
@@ -1672,6 +1672,37 @@
                     <label for="settings-discount-label" class="text-xs font-bold uppercase text-on-surface-variant">Discount Label</label>
                     <input type="text" id="settings-discount-label" placeholder="e.g. Member Discount, Early Bird" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary">
                     <span class="text-[10px] text-on-surface-variant">Discount label shown on invoice summary.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Admin Authentication & Profile Settings -->
+              <div class="pt-6 border-t border-outline-variant space-y-4">
+                <h4 class="font-bold text-xs uppercase text-primary tracking-wider flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                  Admin Portal Credentials &amp; Profile
+                </h4>
+                <p class="text-xs text-on-surface-variant">Change the credentials used to log in to this administration portal, and set the profile avatar.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <!-- Admin Username -->
+                  <div class="flex flex-col gap-1.5">
+                    <label for="settings-admin-username" class="text-xs font-bold uppercase text-on-surface-variant">Login Username</label>
+                    <input type="text" id="settings-admin-username" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm">
+                    <span class="text-[10px] text-on-surface-variant">Default: admin</span>
+                  </div>
+
+                  <!-- Admin Password -->
+                  <div class="flex flex-col gap-1.5">
+                    <label for="settings-admin-password" class="text-xs font-bold uppercase text-on-surface-variant">Login Password</label>
+                    <input type="password" id="settings-admin-password" placeholder="Leave blank to keep current" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm">
+                    <span class="text-[10px] text-on-surface-variant">Default: admin123</span>
+                  </div>
+
+                  <!-- Admin Avatar URL -->
+                  <div class="flex flex-col gap-1.5">
+                    <label for="settings-admin-avatar" class="text-xs font-bold uppercase text-on-surface-variant">Avatar Image URL</label>
+                    <input type="url" id="settings-admin-avatar" required class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm">
+                    <span class="text-[10px] text-on-surface-variant">Profile picture shown in sidebar.</span>
                   </div>
                 </div>
               </div>

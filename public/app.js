@@ -118,6 +118,17 @@ async function loadSettings() {
 function applyDynamicSettings() {
   if (!appSettings.merchant_name) return;
 
+  // Document Title & Description
+  document.title = `${appSettings.merchant_name} Admin`;
+  const metaDesc = document.querySelector('meta[name="description"]');
+  if (metaDesc) {
+    metaDesc.content = `${appSettings.merchant_name} Voucher Management System. Securely generate, print, and scan vouchers.`;
+  }
+
+  // Login screen title
+  const loginTitle = document.getElementById('login-branding-title');
+  if (loginTitle) loginTitle.innerText = appSettings.merchant_name;
+
   // Sidebar header title
   const sidebarTitle = document.querySelector('aside h1');
   if (sidebarTitle) sidebarTitle.innerText = appSettings.merchant_name;
@@ -127,8 +138,18 @@ function applyDynamicSettings() {
   if (navbarTitle) navbarTitle.innerText = `${appSettings.merchant_name} Admin`;
 
   // Voucher generator branding panel header
-  const generatorHeader = document.querySelector('#panel-generator h3');
+  const generatorHeader = document.getElementById('generator-branding-title');
   if (generatorHeader) generatorHeader.innerText = appSettings.merchant_name;
+
+  // Sidebar Admin profile
+  const sidebarAvatarImg = document.getElementById('sidebar-avatar-img');
+  if (sidebarAvatarImg) {
+    sidebarAvatarImg.src = appSettings.admin_avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
+  }
+  const sidebarAvatarName = document.getElementById('sidebar-avatar-name');
+  if (sidebarAvatarName) {
+    sidebarAvatarName.innerText = appSettings.admin_username || 'Super Admin';
+  }
 
   // Render logo if configured
   const sidebarLogoImg = document.getElementById('sidebar-logo-image');
@@ -317,8 +338,15 @@ function setupEventListeners() {
         service_fee: document.getElementById('settings-service-fee').value.trim(),
         discount_rate: document.getElementById('settings-discount-rate').value.trim(),
         discount_type: document.getElementById('settings-discount-type').value,
-        discount_label: document.getElementById('settings-discount-label').value.trim()
+        discount_label: document.getElementById('settings-discount-label').value.trim(),
+        admin_username: document.getElementById('settings-admin-username').value.trim(),
+        admin_avatar_url: document.getElementById('settings-admin-avatar').value.trim()
       };
+
+      const newPassword = document.getElementById('settings-admin-password').value;
+      if (newPassword) {
+        payload.admin_password = newPassword;
+      }
 
       try {
         showLoading(true, 'Saving Settings...', 'Updating system configurations...');
@@ -880,6 +908,11 @@ function renderSettingsForm() {
   const discTypeEl = document.getElementById('settings-discount-type');
   if (discTypeEl) discTypeEl.value = appSettings.discount_type || 'percentage';
   document.getElementById('settings-discount-label').value = appSettings.discount_label || 'Diskon';
+  
+  // Admin credentials
+  document.getElementById('settings-admin-username').value = appSettings.admin_username || 'admin';
+  document.getElementById('settings-admin-password').value = '';
+  document.getElementById('settings-admin-avatar').value = appSettings.admin_avatar_url || '';
 }
 
 // Confirm Invoice payment
