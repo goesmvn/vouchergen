@@ -1360,25 +1360,15 @@ function printAgentContract(id) {
 
         <div>
           <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 3: VALIDITAS & SYARAT</h4>
-          <p class="text-xs leading-relaxed text-gray-650">Tarif kontrak di atas berlaku sejak tanggal ditandatanganinya perjanjian ini dan akan terus ditinjau kembali secara berkala sesuai ketentuan tarif publik PIHAK PERTAMA. Tiket yang dibeli tidak dapat ditransfer atau di-refund secara sepihak kecuali ditentukan lain dalam kesepakatan.</p>
+          <p class="text-xs leading-relaxed text-gray-650">Tarif kontrak di atas berlaku sejak tanggal diterbitkannya surat ini dan akan terus ditinjau kembali secara berkala sesuai ketentuan tarif publik. Tiket yang dibeli tidak dapat ditransfer atau di-refund secara sepihak kecuali ditentukan lain dalam kesepakatan.</p>
         </div>
       </div>
 
       <!-- Blok Tanda Tangan -->
-      <div class="grid grid-cols-2 gap-8 text-center pt-8 border-t border-dashed border-gray-300 text-sm mt-12 break-inside-avoid">
-        <div>
-          <p class="font-semibold text-gray-800">PIHAK KEDUA (Mitra Agen)</p>
-          <p class="text-xs text-gray-400 mt-0.5">Selaku Pihak yang Menerima Tarif Kontrak</p>
-          <div class="h-20 flex items-center justify-center">
-            <span class="text-xs text-gray-300 italic border border-dashed p-1 rounded border-gray-300">Materai / Stamp</span>
-          </div>
-          <p class="font-bold text-gray-900 underline">${agent.name}</p>
-          <p class="text-xs text-gray-500 font-mono">${agent.code}</p>
-        </div>
-        
-        <div>
-          <p class="font-semibold text-gray-800">PIHAK PERTAMA (Penyedia Layanan)</p>
-          <p class="text-xs text-gray-400 mt-0.5">Selaku Pihak yang Memberikan Tarif Kontrak</p>
+      <div class="flex justify-end text-center pt-8 border-t border-dashed border-gray-300 text-sm mt-12 break-inside-avoid">
+        <div class="w-64 pr-4">
+          <p class="font-semibold text-gray-800">Pemberi Tarif Kontrak</p>
+          <p class="text-xs text-gray-400 mt-0.5">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</p>
           <div class="h-20 flex items-center justify-center">
             <span class="text-[10px] text-emerald-600/60 font-black border border-emerald-500/20 px-2 py-1 bg-emerald-50/50 rounded uppercase tracking-widest font-mono">AUTHORIZED STAMP</span>
           </div>
