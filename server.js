@@ -164,6 +164,21 @@ async function initializeDatabase() {
       // ignore
     }
 
+    // Agent Contract Items Table (per-item discount rates)
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS agent_contract_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id INTEGER NOT NULL,
+        ticket_id INTEGER NOT NULL,
+        discount_rate REAL DEFAULT 0,
+        discount_type TEXT DEFAULT 'percentage',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(agent_id, ticket_id),
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+        FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+      )
+    `);
+
     // Redemptions Table (to track double scanning)
     await dbRun(`
       CREATE TABLE IF NOT EXISTS redemptions (
@@ -991,8 +1006,66 @@ app.delete('/api/agents/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
     await dbRun('UPDATE invoices SET agent_id = NULL WHERE agent_id = ?', [id]);
+    await dbRun('DELETE FROM agent_contract_items WHERE agent_id = ?', [id]);
     await dbRun('DELETE FROM agents WHERE id = ?', [id]);
     res.json({ message: 'Agent deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Agent Contract Items API
+app.get('/api/agents/:id/contract-items', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rows = await dbAll(
+      'SELECT aci.*, t.title, t.price FROM agent_contract_items aci JOIN tickets t ON aci.ticket_id = t.id WHERE aci.agent_id = ? ORDER BY t.title ASC',
+      [id]
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/agents/:id/contract-items', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { ticket_id, discount_rate, discount_type } = req.body;
+  if (!ticket_id) {
+    return res.status(400).json({ error: 'Ticket ID is required' });
+  }
+  try {
+    const discType = discount_type || 'percentage';
+    const result = await dbRun(
+      'INSERT OR REPLACE INTO agent_contract_items (agent_id, ticket_id, discount_rate, discount_type) VALUES (?, ?, ?, ?)',
+      [id, parseInt(ticket_id), parseFloat(discount_rate) || 0, discType]
+    );
+    res.status(201).json({ id: result.id, agent_id: parseInt(id), ticket_id: parseInt(ticket_id), discount_rate, discount_type: discType });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/agents/:id/contract-items/:itemId', authenticateToken, async (req, res) => {
+  const { id, itemId } = req.params;
+  const { discount_rate, discount_type } = req.body;
+  try {
+    const discType = discount_type || 'percentage';
+    await dbRun(
+      'UPDATE agent_contract_items SET discount_rate = ?, discount_type = ? WHERE id = ? AND agent_id = ?',
+      [parseFloat(discount_rate) || 0, discType, itemId, id]
+    );
+    res.json({ id: parseInt(itemId), agent_id: parseInt(id), discount_rate, discount_type: discType });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/agents/:id/contract-items/:itemId', authenticateToken, async (req, res) => {
+  const { id, itemId } = req.params;
+  try {
+    await dbRun('DELETE FROM agent_contract_items WHERE id = ? AND agent_id = ?', [itemId, id]);
+    res.json({ message: 'Contract item deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

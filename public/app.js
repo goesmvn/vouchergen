@@ -42,6 +42,7 @@ let ticketCatalog = [];
 let invoiceCatalog = [];
 let agentsList = [];
 let usersList = [];
+let agentContractItems = {}; // agent_id -> { ticket_id -> { discount_rate, discount_type } }
 let bookingQuantities = {};
 let selectedBookingDateString = '';
 let activeVoucherTemplate = 1; // 1=Classic, 2=Boarding Pass, 3=Minimal
@@ -1489,6 +1490,10 @@ function resetAgentForm() {
   if (typeEl) typeEl.value = 'percentage';
   document.getElementById('agent-form-title').innerText = 'Register New Agent';
   
+  // Clear contract items UI
+  const container = document.getElementById('contract-items-container');
+  if (container) container.innerHTML = '';
+
   const cancelBtn = document.getElementById('btn-cancel-agent-edit');
   if (cancelBtn) cancelBtn.classList.add('hidden');
 }
@@ -1530,6 +1535,26 @@ async function saveAgentForm(event) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to save agent');
 
+    const agentId = id || data.id;
+    
+    // Save contract items if editing existing agent
+    if (id && agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0) {
+      for (const [ticketId, itemData] of Object.entries(agentContractItems[agentId])) {
+        await fetch(`/api/agents/${agentId}/contract-items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token
+          },
+          body: JSON.stringify({
+            ticket_id: parseInt(ticketId),
+            discount_rate: itemData.discount_rate,
+            discount_type: itemData.discount_type
+          })
+        });
+      }
+    }
+
     showToast(id ? 'Agent profile updated!' : 'Agent successfully registered!');
     resetAgentForm();
     await loadAgents();
@@ -1560,6 +1585,9 @@ function editAgent(id) {
   const cancelBtn = document.getElementById('btn-cancel-agent-edit');
   if (cancelBtn) cancelBtn.classList.remove('hidden');
 
+  // Load contract items for this agent
+  await loadAgentContractItems(agent.id);
+
   // Scroll to form
   document.getElementById('store-agent-form').scrollIntoView({ behavior: 'smooth' });
 }
@@ -1582,6 +1610,117 @@ async function deleteAgent(id) {
   } finally {
     showLoading(false);
   }
+}
+
+// Load Agent Contract Items
+async function loadAgentContractItems(agentId) {
+  try {
+    const response = await fetch(`/api/agents/${agentId}/contract-items`, {
+      headers: { 'Authorization': token }
+    });
+    const items = await response.json();
+    agentContractItems[agentId] = {};
+    items.forEach(item => {
+      agentContractItems[agentId][item.ticket_id] = {
+        discount_rate: item.discount_rate,
+        discount_type: item.discount_type
+      };
+    });
+    renderContractItems(agentId);
+  } catch (err) {
+    console.error('Failed to load contract items:', err);
+    renderContractItems(agentId);
+  }
+}
+
+// Render Contract Items UI
+function renderContractItems(agentId) {
+  const container = document.getElementById('contract-items-container');
+  if (!container) return;
+  
+  const items = agentContractItems[agentId] || {};
+  const activeTickets = ticketCatalog.filter(t => t.is_active === 1);
+  
+  if (Object.keys(items).length === 0) {
+    container.innerHTML = '<p class="text-xs text-on-surface-variant text-center py-4">No contract items configured. Click \u0022Add Item\u0022 to start.</p>';
+    return;
+  }
+
+  container.innerHTML = Object.entries(items).map(([ticketId, data]) => {
+    const ticket = activeTickets.find(t => t.id == ticketId);
+    if (!ticket) return '';
+    return `
+      <div class="flex items-center gap-2 p-2 bg-surface-container-low border border-outline-variant rounded-lg" data-ticket-id="${ticketId}">
+        <select class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItem(${agentId}, ${ticketId}, this.value)">
+          ${activeTickets.map(t => `<option value="${t.id}" ${t.id == ticketId ? 'selected' : ''}></option>').join('')}
+        </select>
+        <div class="flex items-center gap-1">
+          <select class="w-[60px] text-xs px-1 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemType(${agentId}, ${ticketId}, this.value)">
+            <option value="percentage" ${data.discount_type === 'percentage' ? 'selected' : ''}>%</option>
+            <option value="nominal" ${data.discount_type === 'nominal' ? 'selected' : ''}>Rp</option>
+          </select>
+          <input type="number" value="${data.discount_rate}" min="0" step="0.5" class="w-20 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemRate(${agentId}, ${ticketId}, this.value)">
+        </div>
+        <button type="button" onclick="removeContractItem(${agentId}, ${ticketId})" class="text-error hover:text-on-error p-1" title="Remove"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+      </div>
+    `;
+  }).join('');
+}
+
+// Add Contract Item Row
+function addContractItemRow() {
+  const agentId = document.getElementById('store-agent-id').value;
+  if (!agentId) {
+    showToast('Please save agent first before adding contract items', true);
+    return;
+  }
+  
+  const container = document.getElementById('contract-items-container');
+  const activeTickets = ticketCatalog.filter(t => t.is_active === 1);
+  
+  if (!agentContractItems[agentId]) agentContractItems[agentId] = {};
+  
+  // Find first ticket not already in contract
+  const usedTicketIds = Object.keys(agentContractItems[agentId]).map(Number);
+  const availableTicket = activeTickets.find(t => !usedTicketIds.includes(t.id));
+  
+  if (!availableTicket) {
+    showToast('All active tickets already have contract rates', true);
+    return;
+  }
+  
+  agentContractItems[agentId][availableTicket.id] = { discount_rate: 0, discount_type: 'percentage' };
+  renderContractItems(agentId);
+}
+
+// Update Contract Item (ticket change)
+function updateContractItem(agentId, oldTicketId, newTicketId) {
+  if (!agentContractItems[agentId]) return;
+  const data = agentContractItems[agentId][oldTicketId];
+  if (!data) return;
+  
+  delete agentContractItems[agentId][oldTicketId];
+  agentContractItems[agentId][newTicketId] = data;
+  renderContractItems(agentId);
+}
+
+// Update Contract Item Rate
+function updateContractItemRate(agentId, ticketId, value) {
+  if (!agentContractItems[agentId] || !agentContractItems[agentId][ticketId]) return;
+  agentContractItems[agentId][ticketId].discount_rate = parseFloat(value) || 0;
+}
+
+// Update Contract Item Type
+function updateContractItemType(agentId, ticketId, type) {
+  if (!agentContractItems[agentId] || !agentContractItems[agentId][ticketId]) return;
+  agentContractItems[agentId][ticketId].discount_type = type;
+}
+
+// Remove Contract Item
+function removeContractItem(agentId, ticketId) {
+  if (!agentContractItems[agentId]) return;
+  delete agentContractItems[agentId][ticketId];
+  renderContractItems(agentId);
 }
 
 // Print Agent Contract Rate Agreement
@@ -1616,26 +1755,28 @@ function printAgentContract(id) {
   const headerTitle = document.querySelector('.modal-action-row h3');
   if (headerTitle) headerTitle.innerText = `Agent Contract: ${agent.name}`;
 
-  // Generate ticket prices table
-  const activeTickets = ticketCatalog.filter(t => t.is_active === 1);
+  // Generate ticket prices table using CONTRACT ITEMS only
+  const contractItems = agentContractItems[agent.id] || {};
   let ticketRowsHtml = '';
   
-  if (activeTickets.length === 0) {
-    ticketRowsHtml = `<tr><td colspan="4" class="text-center py-4 border border-gray-300 text-gray-500">No active ticket categories.</td></tr>`;
+  if (Object.keys(contractItems).length === 0) {
+    ticketRowsHtml = `<tr><td colspan="4" class="text-center py-4 border border-gray-300 text-gray-500">No contract items configured. Add items in Agent edit form.</td></tr>`;
   } else {
-    activeTickets.forEach(ticket => {
-      // Calculate agent net price (base price minus agent discount)
+    for (const [ticketId, itemData] of Object.entries(contractItems)) {
+      const ticket = ticketCatalog.find(t => t.id === parseInt(ticketId));
+      if (!ticket) continue;
+
       const publishPrice = ticket.price;
       let netPrice = publishPrice;
       let discountLabelText = '';
       
-      if (agent.discount_type === 'nominal') {
-        netPrice = Math.max(0, publishPrice - agent.discount_rate);
-        discountLabelText = `Rp ${agent.discount_rate.toLocaleString('id-ID')}`;
+      if (itemData.discount_type === 'nominal') {
+        netPrice = Math.max(0, publishPrice - itemData.discount_rate);
+        discountLabelText = `Rp ${itemData.discount_rate.toLocaleString('id-ID')}`;
       } else {
-        const discountAmt = Math.round(publishPrice * agent.discount_rate / 100);
+        const discountAmt = Math.round(publishPrice * itemData.discount_rate / 100);
         netPrice = Math.max(0, publishPrice - discountAmt);
-        discountLabelText = `${agent.discount_rate}%`;
+        discountLabelText = `${itemData.discount_rate}%`;
       }
 
       ticketRowsHtml += `
@@ -1646,7 +1787,7 @@ function printAgentContract(id) {
           <td class="py-3 px-4 text-sm text-right text-primary font-bold font-mono border border-gray-300">Rp ${netPrice.toLocaleString('id-ID')}</td>
         </tr>
       `;
-    });
+    }
   }
 
   const currentDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -2206,22 +2347,58 @@ function updateBookingTotal() {
     }
   });
 
-  // Read per-transaction overrides (fall back to appSettings)
-  const discInput = document.getElementById('checkout-discount')?.value;
-  const discountVal = discInput !== '' && discInput !== undefined ? parseFloat(discInput) : (parseFloat(appSettings.discount_rate) || 0);
-  const discTypeEl = document.getElementById('checkout-discount-type');
-  const discType = discTypeEl ? discTypeEl.value : (appSettings.discount_type || 'percentage');
+  // Check if agent is selected and has contract items
+  const agentSelect = document.getElementById('booking-agent-select');
+  const agentId = agentSelect ? agentSelect.value : null;
   
+  let discountAmt = 0;
+  let discType = 'percentage';
+  let discountVal = 0;
+  let discLabel = 'Diskon';
+  let itemizedDiscounts = [];
+  
+  if (agentId && agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0) {
+    // Use per-item contract discounts
+    const contractItems = agentContractItems[agentId];
+    selectedItems.forEach(({ ticket, qty }) => {
+      const contractItem = contractItems[ticket.id];
+      if (contractItem) {
+        const publishPrice = ticket.price - (ticket.discount || 0);
+        let netPrice = publishPrice;
+        let itemDiscountLabel = '';
+        
+        if (contractItem.discount_type === 'nominal') {
+          netPrice = Math.max(0, publishPrice - contractItem.discount_rate);
+          itemDiscountLabel = `Rp ${contractItem.discount_rate.toLocaleString('id-ID')}`;
+        } else {
+          const discountAmtItem = Math.round(publishPrice * contractItem.discount_rate / 100);
+          netPrice = Math.max(0, publishPrice - discountAmtItem);
+          itemDiscountLabel = `${contractItem.discount_rate}%`;
+        }
+        
+        const itemDiscount = (publishPrice - netPrice) * qty;
+        discountAmt += itemDiscount;
+        itemizedDiscounts.push({ ticket, itemDiscount, itemDiscountLabel, netPrice, qty });
+      }
+    });
+    discLabel = 'Diskon Kontrak Agen';
+  } else {
+    // Use global/fallback discount
+    const discInput = document.getElementById('checkout-discount')?.value;
+    discountVal = discInput !== '' && discInput !== undefined ? parseFloat(discInput) : (parseFloat(appSettings.discount_rate) || 0);
+    const discTypeEl = document.getElementById('checkout-discount-type');
+    discType = discTypeEl ? discTypeEl.value : (appSettings.discount_type || 'percentage');
+    discLabel = document.getElementById('checkout-discount-label')?.value.trim() || appSettings.discount_label || 'Diskon';
+    
+    if (discType === 'percentage') {
+      discountAmt = Math.round(subtotal * discountVal / 100);
+    } else {
+      discountAmt = discountVal;
+    }
+  }
+
   const taxRate = parseFloat(document.getElementById('checkout-tax')?.value) || parseFloat(appSettings.tax_rate) || 0;
   const serviceFee = parseFloat(appSettings.service_fee) || 0;
-  const discLabel = document.getElementById('checkout-discount-label')?.value.trim() || appSettings.discount_label || 'Diskon';
-
-  let discountAmt = 0;
-  if (discType === 'percentage') {
-    discountAmt = Math.round(subtotal * discountVal / 100);
-  } else {
-    discountAmt = discountVal;
-  }
   const afterDiscount = Math.max(0, subtotal - discountAmt);
   const taxAmt = Math.round(afterDiscount * taxRate / 100);
   const total = afterDiscount + taxAmt + serviceFee;
@@ -2232,15 +2409,32 @@ function updateBookingTotal() {
     if (selectedItems.length === 0) {
       itemsEl.innerHTML = '<p class="text-xs text-on-surface-variant italic">No tickets selected.</p>';
     } else {
-      itemsEl.innerHTML = selectedItems.map(({ ticket, qty }) => `
-        <div class="flex justify-between items-center py-1.5 border-b border-outline-variant last:border-0">
-          <div>
-            <div class="text-xs font-semibold text-on-surface">${ticket.title}</div>
-            <div class="text-[10px] text-on-surface-variant">${qty} × Rp ${(ticket.price - (ticket.discount || 0)).toLocaleString('id-ID')}</div>
-          </div>
-          <span class="text-xs font-bold text-on-surface">Rp ${((ticket.price - (ticket.discount || 0)) * qty).toLocaleString('id-ID')}</span>
-        </div>
-      `).join('');
+      itemsEl.innerHTML = selectedItems.map(({ ticket, qty }) => {
+        // Check if this item has a contract discount
+        const contractDiscount = itemizedDiscounts.find(d => d.ticket.id === ticket.id);
+        if (contractDiscount) {
+          return `
+            <div class="flex justify-between items-center py-1.5 border-b border-outline-variant last:border-0">
+              <div>
+                <div class="text-xs font-semibold text-on-surface">${ticket.title}</div>
+                <div class="text-[10px] text-on-surface-variant">${qty} × Rp ${(ticket.price - (ticket.discount || 0)).toLocaleString('id-ID')}</div>
+                <div class="text-[10px] text-emerald-600">Diskon: ${contractDiscount.itemDiscountLabel} → Net: Rp ${contractDiscount.netPrice.toLocaleString('id-ID')}</div>
+              </div>
+              <span class="text-xs font-bold text-on-surface">Rp ${((ticket.price - (ticket.discount || 0)) * qty).toLocaleString('id-ID')}</span>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="flex justify-between items-center py-1.5 border-b border-outline-variant last:border-0">
+              <div>
+                <div class="text-xs font-semibold text-on-surface">${ticket.title}</div>
+                <div class="text-[10px] text-on-surface-variant">${qty} × Rp ${(ticket.price - (ticket.discount || 0)).toLocaleString('id-ID')}</div>
+              </div>
+              <span class="text-xs font-bold text-on-surface">Rp ${((ticket.price - (ticket.discount || 0)) * qty).toLocaleString('id-ID')}</span>
+            </div>
+          `;
+        }
+      }).join('');
     }
   }
 
@@ -2251,9 +2445,9 @@ function updateBookingTotal() {
       <span class="text-xs text-on-surface-variant font-semibold">Subtotal</span>
       <span class="font-semibold text-on-surface">Rp ${subtotal.toLocaleString('id-ID')}</span>
     </div>`;
-    if (discountVal > 0) {
+    if (discountAmt > 0) {
       rows += `<div class="flex justify-between items-center text-emerald-600">
-        <span class="text-xs font-semibold">${discLabel} ${discType === 'percentage' ? `(${discountVal}%)` : ''}</span>
+        <span class="text-xs font-semibold">${discLabel} ${itemizedDiscounts.length > 0 ? '(Per Item)' : (discType === 'percentage' ? `(${discountVal}%)` : '')}</span>
         <span class="font-semibold">- Rp ${discountAmt.toLocaleString('id-ID')}</span>
       </div>`;
     }
@@ -2269,6 +2463,10 @@ function updateBookingTotal() {
         <span class="font-semibold">Rp ${serviceFee.toLocaleString('id-ID')}</span>
       </div>`;
     }
+    rows += `<div class="flex justify-between items-center pt-2 border-t border-outline-variant">
+      <span class="font-bold text-on-surface text-sm">Total</span>
+      <span class="font-bold text-on-surface text-lg text-primary">Rp ${total.toLocaleString('id-ID')}</span>
+    </div>`;
     breakdownEl.innerHTML = rows;
   }
 
