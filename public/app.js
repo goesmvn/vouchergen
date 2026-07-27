@@ -1652,7 +1652,7 @@ function renderContractItems(agentId) {
     return `
       <div class="flex items-center gap-2 p-2 bg-surface-container-low border border-outline-variant rounded-lg" data-ticket-id="${ticketId}">
         <select class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItem(${agentId}, ${ticketId}, this.value)">
-          ${activeTickets.map(t => `<option value="${t.id}" ${t.id == ticketId ? 'selected' : ''}></option>').join('')}
+          ${activeTickets.map(t => `<option value="${t.id}" ${t.id == ticketId ? 'selected' : ''}>${t.title}</option>`).join('')}
         </select>
         <div class="flex items-center gap-1">
           <select class="w-[60px] text-xs px-1 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemType(${agentId}, ${ticketId}, this.value)">
