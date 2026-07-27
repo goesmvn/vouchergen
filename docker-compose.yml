@@ -40,6 +40,10 @@ services:
       - WAHA_WEBHOOKS_1_EVENTS=message,message.any
       - WAHA_WEBHOOKS_1_URL=http://voucher-generator:3000/api/whatsapp/webhook
       - WAHA_WEBHOOKS_1_SESSION=default
+      - WAHA_DASHBOARD_USERNAME=admin
+      - WAHA_DASHBOARD_PASSWORD=adminwaha
+      - WHATSAPP_SWAGGER_USERNAME=admin
+      - WHATSAPP_SWAGGER_PASSWORD=adminwaha
     volumes:
       - waha-session:/app/.sessions
     networks:
