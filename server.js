@@ -230,20 +230,49 @@ async function initializeDatabase() {
       )
     `);
 
-    // Seed default admin user
-    const adminUser = await dbGet("SELECT id FROM users WHERE username = 'admin'");
+    // Seed default admin user (migrate from settings table if available to prevent lockout)
+    let seedUsername = 'admin';
+    let seedPassword = 'admin123';
+    let seedAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80';
+
+    try {
+      const dbAdminUsernameSetting = await dbGet("SELECT value FROM settings WHERE key = 'admin_username'");
+      const dbAdminPasswordSetting = await dbGet("SELECT value FROM settings WHERE key = 'admin_password'");
+      const dbAdminAvatarSetting = await dbGet("SELECT value FROM settings WHERE key = 'admin_avatar_url'");
+
+      if (dbAdminUsernameSetting && dbAdminUsernameSetting.value) {
+        seedUsername = dbAdminUsernameSetting.value.trim();
+      }
+      if (dbAdminPasswordSetting && dbAdminPasswordSetting.value) {
+        seedPassword = dbAdminPasswordSetting.value;
+      }
+      if (dbAdminAvatarSetting && dbAdminAvatarSetting.value) {
+        seedAvatar = dbAdminAvatarSetting.value.trim();
+      }
+    } catch (e) {
+      console.log('Settings table not fully ready or empty, using defaults for admin seed');
+    }
+
+    const adminUser = await dbGet("SELECT id FROM users WHERE username = ?", [seedUsername]);
     if (!adminUser) {
       await dbRun(
         "INSERT INTO users (name, username, password, avatar_url, role) VALUES (?, ?, ?, ?, ?)",
         [
           'Super Admin',
-          'admin',
-          'admin123',
-          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80',
+          seedUsername,
+          seedPassword,
+          seedAvatar,
           'admin'
         ]
       );
-      console.log('Seeded default admin user to users table.');
+      console.log(`Seeded default admin user (${seedUsername}) to users table.`);
+    } else {
+      // Force sync the password from settings to prevent lockout in case of mismatch
+      await dbRun(
+        "UPDATE users SET password = ?, avatar_url = ? WHERE username = ?",
+        [seedPassword, seedAvatar, seedUsername]
+      );
+      console.log(`Synced credentials for admin user (${seedUsername}) from settings table.`);
     }
 
     // WhatsApp Logs Table
