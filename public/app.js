@@ -1566,7 +1566,7 @@ async function saveAgentForm(event) {
 }
 
 // Edit Agent Trigger
-function editAgent(id) {
+async function editAgent(id) {
   const agent = agentsList.find(a => a.id === id);
   if (!agent) return;
 
