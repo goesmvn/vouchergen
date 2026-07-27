@@ -880,8 +880,9 @@ app.get('/api/vouchers/:code', async (req, res) => {
     }
 
     const invoice = await dbGet(
-      `SELECT invoices.*
+      `SELECT invoices.*, agents.name as agent_name
        FROM invoices
+       LEFT JOIN agents ON invoices.agent_id = agents.id
        WHERE invoices.voucher_code = ?`,
       [baseCode]
     );

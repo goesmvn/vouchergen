@@ -1737,7 +1737,11 @@ function removeContractItem(agentId, ticketId) {
 }
 
 // Print Agent Contract Rate Agreement
-function printAgentContract(id) {
+window.switchContractLanguage = function(agentId, lang) {
+  printAgentContract(parseInt(agentId), lang);
+};
+
+function printAgentContract(id, lang = 'id') {
   const agent = agentsList.find(a => a.id === id);
   if (!agent) {
     showToast('Agent not found', true);
@@ -1773,7 +1777,7 @@ function printAgentContract(id) {
   let ticketRowsHtml = '';
   
   if (Object.keys(contractItems).length === 0) {
-    ticketRowsHtml = `<tr><td colspan="4" class="text-center py-4 border border-gray-300 text-gray-500">No contract items configured. Add items in Agent edit form.</td></tr>`;
+    ticketRowsHtml = `<tr><td colspan="4" class="text-center py-4 border border-gray-300 text-gray-500">${lang === 'en' ? 'No contract items configured. Add items in Agent edit form.' : 'Belum ada item kontrak dikonfigurasi. Tambahkan item di form edit Agen.'}</td></tr>`;
   } else {
     for (const [ticketId, itemData] of Object.entries(contractItems)) {
       const ticket = ticketCatalog.find(t => t.id === parseInt(ticketId));
@@ -1803,10 +1807,18 @@ function printAgentContract(id) {
     }
   }
 
-  const currentDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const locale = lang === 'en' ? 'en-US' : 'id-ID';
+  const currentDate = new Date().toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 
   // Generate contract HTML template
   modalBody.innerHTML = `
+    <!-- Language Toggle (No Print) -->
+    <div class="flex items-center gap-2 mb-6 no-print justify-end max-w-4xl mx-auto w-full">
+      <span class="text-xs text-on-surface-variant font-semibold uppercase tracking-wider mr-1">${lang === 'en' ? 'Contract Language:' : 'Bahasa Kontrak:'}</span>
+      <button onclick="window.switchContractLanguage('${agent.id}', 'id')" class="px-3 py-1 rounded-full text-xs font-bold border transition-all duration-150 ${lang === 'id' ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'}">Bahasa Indonesia</button>
+      <button onclick="window.switchContractLanguage('${agent.id}', 'en')" class="px-3 py-1 rounded-full text-xs font-bold border transition-all duration-150 ${lang === 'en' ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'}">English</button>
+    </div>
+
     <div class="contract-container max-w-4xl mx-auto bg-white p-8 md:p-12 text-gray-800 shadow-sm border border-gray-200 rounded-xl relative">
       <!-- Kop Surat -->
       <div class="flex items-center gap-6 border-b-4 border-double border-gray-800 pb-6 mb-8 flex-col md:flex-row text-center md:text-left">
@@ -1820,49 +1832,75 @@ function printAgentContract(id) {
 
       <!-- Judul Surat -->
       <div class="text-center mb-8">
-        <h1 class="text-lg md:text-xl font-extrabold uppercase text-gray-950 underline tracking-wider">SURAT PERJANJIAN & KONTRAK RATE AGEN</h1>
+        <h1 class="text-lg md:text-xl font-extrabold uppercase text-gray-950 underline tracking-wider">
+          ${lang === 'en' ? 'COOPERATION AGREEMENT & AGENT CONTRACT RATE' : 'SURAT PERJANJIAN & KONTRAK RATE AGEN'}
+        </h1>
         <p class="text-xs text-gray-500 mt-1 font-mono">No: ${agent.code}/AGR-${new Date().getFullYear()}/${Date.now().toString().slice(-4)}</p>
       </div>
 
       <!-- Pembukaan Perjanjian -->
       <div class="text-sm leading-relaxed mb-6 space-y-3">
-        <p>Pada hari ini, tanggal <strong>${currentDate}</strong>, yang bertanda tangan di bawah ini sepakat mengadakan perjanjian kerjasama penjualan tiket masuk antara:</p>
+        <p>
+          ${lang === 'en' 
+            ? `On this day, date <strong>${currentDate}</strong>, the undersigned parties hereby agree to establish a ticket sales cooperation agreement between:` 
+            : `Pada hari ini, tanggal <strong>${currentDate}</strong>, yang bertanda tangan di bawah ini sepakat mengadakan perjanjian kerjasama penjualan tiket masuk antara:`}
+        </p>
         
         <div class="pl-4 border-l-2 border-primary space-y-1 my-3 bg-gray-50 p-3 rounded">
-          <p class="font-bold text-gray-900">PIHAK PERTAMA (Penyedia Layanan / Merchant):</p>
-          <p class="text-xs">Nama Perusahaan: <strong class="text-primary">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</strong></p>
-          <p class="text-xs">Alamat: ${appSettings.merchant_address || 'Toya Bungkah, Kintamani, Bali'}</p>
+          <p class="font-bold text-gray-900">${lang === 'en' ? 'FIRST PARTY (Service Provider / Merchant):' : 'PIHAK PERTAMA (Penyedia Layanan / Merchant):'}</p>
+          <p class="text-xs">${lang === 'en' ? 'Company Name:' : 'Nama Perusahaan:'} <strong class="text-primary">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</strong></p>
+          <p class="text-xs">${lang === 'en' ? 'Address:' : 'Alamat:'} ${appSettings.merchant_address || 'Toya Bungkah, Kintamani, Bali'}</p>
         </div>
 
         <div class="pl-4 border-l-2 border-secondary space-y-1 my-3 bg-gray-50 p-3 rounded">
-          <p class="font-bold text-gray-900">PIHAK KEDUA (Mitra Agen / Company):</p>
-          <p class="text-xs">Nama Agen / Instansi: <strong>${agent.name}</strong></p>
-          <p class="text-xs">Kode Agen Unik: <span class="font-code-mono font-bold text-primary">${agent.code}</span></p>
-          <p class="text-xs">Nomor Telepon: ${agent.phone || '-'}</p>
+          <p class="font-bold text-gray-900">${lang === 'en' ? 'SECOND PARTY (Agent Partner / Company):' : 'PIHAK KEDUA (Mitra Agen / Company):'}</p>
+          <p class="text-xs">${lang === 'en' ? 'Agent / Company Name:' : 'Nama Agen / Instansi:'} <strong>${agent.name}</strong></p>
+          <p class="text-xs">${lang === 'en' ? 'Unique Agent Code:' : 'Kode Agen Unik:'} <span class="font-code-mono font-bold text-primary">${agent.code}</span></p>
+          <p class="text-xs">${lang === 'en' ? 'Phone Number:' : 'Nomor Telepon:'} ${agent.phone || '-'}</p>
           <p class="text-xs">Email: ${agent.email || '-'}</p>
-          <p class="text-xs">Alamat: ${agent.address || '—'}</p>
+          <p class="text-xs">${lang === 'en' ? 'Address:' : 'Alamat:'} ${agent.address || '—'}</p>
         </div>
         
-        <p>Kedua belah pihak sepakat untuk melakukan hubungan kerjasama penjualan tiket masuk dengan ketentuan tarif khusus (Contract Rate) sebagai berikut:</p>
+        <p>
+          ${lang === 'en' 
+            ? 'Both parties agree to establish a ticket sales cooperation with special contract rate terms as follows:' 
+            : 'Kedua belah pihak sepakat untuk melakukan hubungan kerjasama penjualan tiket masuk dengan ketentuan tarif khusus (Contract Rate) sebagai berikut:'}
+        </p>
       </div>
 
       <!-- Ketentuan Perjanjian -->
       <div class="space-y-4 mb-8">
         <div>
-          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 1: KETENTUAN DISKON AGEN</h4>
-          <p class="text-xs leading-relaxed text-gray-650">PIHAK PERTAMA memberikan diskon khusus keagenan (Contract Rate) sebesar <strong class="text-emerald-600">${agent.discount_rate}%</strong> (persen) dari harga publik yang berlaku. Potongan ini akan langsung diaplikasikan di setiap pemesanan tiket masuk menggunakan kode agen resmi PIHAK KEDUA.</p>
+          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">
+            ${lang === 'en' ? 'ARTICLE 1: AGENT DISCOUNT POLICY' : 'PASAL 1: KETENTUAN DISKON AGEN'}
+          </h4>
+          <p class="text-xs leading-relaxed text-gray-650">
+            ${lang === 'en'
+              ? `THE FIRST PARTY provides a special agent discount (Contract Rate) from the prevailing public price. This discount will be applied directly to every ticket booking using the official agent code of the SECOND PARTY.`
+              : `PIHAK PERTAMA memberikan diskon khusus keagenan (Contract Rate) dari harga publik yang berlaku. Potongan ini akan langsung diaplikasikan di setiap pemesanan tiket masuk menggunakan kode agen resmi PIHAK KEDUA.`}
+          </p>
         </div>
 
         <div>
-          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 2: DAFTAR TARIF KONTRAK (CONTRACT RATE TABLE)</h4>
+          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">
+            ${lang === 'en' ? 'ARTICLE 2: CONTRACT RATE TABLE' : 'PASAL 2: DAFTAR TARIF KONTRAK (CONTRACT RATE TABLE)'}
+          </h4>
           <div class="overflow-x-auto mt-2">
             <table class="w-full text-left border-collapse border border-gray-300">
               <thead>
                 <tr class="bg-gray-150 border-b border-gray-300">
-                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-gray-700 border border-gray-300 w-2/5">Kategori Tiket / Voucher</th>
-                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-right text-gray-700 border border-gray-300">Harga Publik (Publish)</th>
-                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-center text-gray-700 border border-gray-300">Diskon Agen</th>
-                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-right text-primary border border-gray-300">Harga Kontrak Agen (Net)</th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-gray-700 border border-gray-300 w-2/5">
+                    ${lang === 'en' ? 'Ticket Category / Voucher' : 'Kategori Tiket / Voucher'}
+                  </th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-right text-gray-700 border border-gray-300">
+                    ${lang === 'en' ? 'Public Price (Publish)' : 'Harga Publik (Publish)'}
+                  </th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-center text-gray-700 border border-gray-300">
+                    ${lang === 'en' ? 'Agent Discount' : 'Diskon Agen'}
+                  </th>
+                  <th class="py-2.5 px-4 font-bold text-xs uppercase text-right text-primary border border-gray-300">
+                    ${lang === 'en' ? 'Agent Contract Price (Net)' : 'Harga Kontrak Agen (Net)'}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1873,21 +1911,27 @@ function printAgentContract(id) {
         </div>
 
         <div>
-          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">PASAL 3: VALIDITAS & SYARAT</h4>
-          <p class="text-xs leading-relaxed text-gray-650">Tarif kontrak di atas berlaku sejak tanggal diterbitkannya surat ini dan akan terus ditinjau kembali secara berkala sesuai ketentuan tarif publik. Tiket yang dibeli tidak dapat ditransfer atau di-refund secara sepihak kecuali ditentukan lain dalam kesepakatan.</p>
+          <h4 class="font-bold text-sm text-gray-900 border-b pb-1 mb-2">
+            ${lang === 'en' ? 'ARTICLE 3: VALIDITY & TERMS' : 'PASAL 3: VALIDITAS & SYARAT'}
+          </h4>
+          <p class="text-xs leading-relaxed text-gray-650">
+            ${lang === 'en'
+              ? 'The above contract rates are valid from the date of this agreement and will be reviewed periodically in accordance with public rate adjustments. Tickets purchased are non-refundable and non-transferable unless agreed otherwise.'
+              : 'Tarif kontrak di atas berlaku sejak tanggal diterbitkannya surat ini dan akan terus ditinjau kembali secara berkala sesuai ketentuan tarif publik. Tiket yang dibeli tidak dapat ditransfer atau di-refund secara sepihak kecuali ditentukan lain dalam kesepakatan.'}
+          </p>
         </div>
       </div>
 
       <!-- Blok Tanda Tangan -->
       <div class="flex justify-end text-center pt-8 border-t border-dashed border-gray-300 text-sm mt-12 break-inside-avoid">
         <div class="w-64 pr-4">
-          <p class="font-semibold text-gray-800">Pemberi Tarif Kontrak</p>
+          <p class="font-semibold text-gray-800">${lang === 'en' ? 'Contract Rate Provider' : 'Pemberi Tarif Kontrak'}</p>
           <p class="text-xs text-gray-400 mt-0.5">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</p>
           <div class="h-20 flex items-center justify-center">
-            <span class="text-[10px] text-emerald-600/60 font-black border border-emerald-500/20 px-2 py-1 bg-emerald-50/50 rounded uppercase tracking-widest font-mono">AUTHORIZED STAMP</span>
+            <span class="text-[10px] text-emerald-600/60 font-black border border-emerald-500/20 px-2 py-1 bg-emerald-50/50 rounded uppercase tracking-widest font-mono">${lang === 'en' ? 'AUTHORIZED STAMP' : 'AUTHORIZED STAMP'}</span>
           </div>
           <p class="font-bold text-gray-900 underline">${appSettings.merchant_name || 'Batur Natural Hot Spring'}</p>
-          <p class="text-xs text-gray-500">Authorized Manager</p>
+          <p class="text-xs text-gray-500">${lang === 'en' ? 'Authorized Manager' : 'Authorized Manager'}</p>
         </div>
       </div>
     </div>
@@ -2725,6 +2769,39 @@ async function processBookingSubmit(payDirectly = false) {
     const url = isEdit ? `/api/invoices/${window.editingInvoiceId}` : '/api/invoices';
     const method = isEdit ? 'PUT' : 'POST';
 
+    const agentId = document.getElementById('booking-customer-type').value === 'agent' ? (document.getElementById('booking-agent-select').value || null) : null;
+    let discRate = parseFloat(document.getElementById('checkout-discount')?.value) || 0;
+    let discType = document.getElementById('checkout-discount-type')?.value || 'percentage';
+    let discLabel = document.getElementById('checkout-discount-label')?.value.trim() || '';
+
+    // Calculate total discount from agent contract items if applicable
+    if (agentId && agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0) {
+      let contractDiscountAmt = 0;
+      const contractItems = agentContractItems[agentId];
+      
+      orderItems.forEach(item => {
+        const ticket = ticketCatalog.find(t => t.id === item.ticketId);
+        if (ticket) {
+          const contractItem = contractItems[ticket.id];
+          if (contractItem) {
+            const publishPrice = ticket.price - (ticket.discount || 0);
+            let netPrice = publishPrice;
+            if (contractItem.discount_type === 'nominal') {
+              netPrice = Math.max(0, publishPrice - contractItem.discount_rate);
+            } else {
+              const discountAmtItem = Math.round(publishPrice * contractItem.discount_rate / 100);
+              netPrice = Math.max(0, publishPrice - discountAmtItem);
+            }
+            contractDiscountAmt += (publishPrice - netPrice) * item.quantity;
+          }
+        }
+      });
+      
+      discRate = contractDiscountAmt;
+      discType = 'nominal';
+      discLabel = 'Diskon Kontrak Agen';
+    }
+
     const response = await fetch(url, {
       method,
       headers: { 
@@ -2737,12 +2814,12 @@ async function processBookingSubmit(payDirectly = false) {
         paymentMethod,
         visitDate: selectedBookingDateString || null,
         downPayment: parseFloat((document.getElementById('checkout-down-payment')?.value || '').replace(/\./g, '')) || 0,
-        discountRate: parseFloat(document.getElementById('checkout-discount')?.value) || 0,
-        discountType: document.getElementById('checkout-discount-type')?.value || 'percentage',
-        discountLabel: document.getElementById('checkout-discount-label')?.value.trim() || '',
+        discountRate: discRate,
+        discountType: discType,
+        discountLabel: discLabel,
         taxRate: parseFloat(document.getElementById('checkout-tax')?.value) || 0,
         serviceFee: parseFloat(appSettings.service_fee) || 0,
-        agentId: document.getElementById('booking-customer-type').value === 'agent' ? (document.getElementById('booking-agent-select').value || null) : null
+        agentId: agentId
       })
     });
 
@@ -3480,6 +3557,7 @@ async function openVoucherModal(code) {
                 <div class="text-lg font-extrabold text-on-surface leading-tight">${item.ticket_title} <span class="text-primary">(x${item.quantity})</span></div>
               </div>
               <div class="text-sm font-semibold text-on-surface-variant mt-2">${data.customer_name}</div>
+              ${data.agent_name ? `<div class="text-[10px] uppercase tracking-wider text-primary font-bold mt-1">Agent: ${data.agent_name}</div>` : ''}
             </div>
             <!-- Visit date banner -->
             <div class="mx-5 mb-4 py-3 px-4 rounded-xl flex items-center justify-between" style="background:linear-gradient(135deg,#1a3d2b,#2d6a4f)">
@@ -3535,6 +3613,7 @@ async function openVoucherModal(code) {
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200">
                   <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Name</div>
                   <div class="text-sm font-extrabold text-gray-900 leading-tight">${data.customer_name}</div>
+                  ${data.agent_name ? `<div class="text-[8px] uppercase tracking-wider text-emerald-700 font-bold mt-1">Agent: ${data.agent_name}</div>` : ''}
                 </div>
                 <div class="px-4 py-3 border-r border-dashed border-emerald-200 flex flex-col items-center justify-center">
                   <div class="text-[9px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Total Pax</div>
@@ -3590,6 +3669,7 @@ async function openVoucherModal(code) {
               <div class="flex-1">
                 <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Customer Name</div>
                 <div class="text-base font-extrabold text-white">${data.customer_name}</div>
+                ${data.agent_name ? `<div class="text-[9px] uppercase tracking-wider text-emerald-400 font-bold mt-0.5">Agent: ${data.agent_name}</div>` : ''}
               </div>
               <div class="text-right">
                 <div class="text-[9px] uppercase tracking-widest text-emerald-500 font-bold mb-1">Total Pax</div>
