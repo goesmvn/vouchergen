@@ -26,8 +26,25 @@ services:
     environment:
       - DB_PATH=/data/database.sqlite
       - GENERATOR_URL=http://voucher-generator:3000
+      - WAHA_URL=http://waha:3000
     networks:
       - default
+
+  waha:
+    image: devlikeapro/waha
+    container_name: waha
+    restart: always
+    ports:
+      - "3006:3000"
+    environment:
+      - WAHA_WEBHOOKS_1_EVENTS=message,message.any
+      - WAHA_WEBHOOKS_1_URL=http://voucher-generator:3000/api/whatsapp/webhook
+      - WAHA_WEBHOOKS_1_SESSION=default
+    volumes:
+      - waha-session:/app/.sessions
+    networks:
+      - default
+      - dokploy-network
 
 networks:
   dokploy-network:
@@ -35,4 +52,5 @@ networks:
 
 volumes:
   voucher-data:
+  waha-session:
 
