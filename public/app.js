@@ -2191,7 +2191,7 @@ window.toggleCustomerType = function() {
 };
 
 // Agent Selected trigger in Voucher Simulator
-window.onAgentSelected = function() {
+window.onAgentSelected = async function() {
   const select = document.getElementById('booking-agent-select');
   if (!select) return;
   
@@ -2203,18 +2203,57 @@ window.onAgentSelected = function() {
   if (agentId) {
     const agent = agentsList.find(a => a.id == agentId);
     if (agent) {
-      // Set discount parameters to agent rate
-      if (discInput) {
-        discInput.value = agent.discount_rate;
-        discInput.disabled = true;
+      // Fetch contract items for this agent if not already cached
+      if (!agentContractItems[agentId]) {
+        try {
+          const response = await fetch(`/api/agents/${agentId}/contract-items`, {
+            headers: { 'Authorization': token }
+          });
+          if (response.ok) {
+            const items = await response.json();
+            agentContractItems[agentId] = {};
+            items.forEach(item => {
+              agentContractItems[agentId][item.ticket_id] = {
+                discount_rate: item.discount_rate,
+                discount_type: item.discount_type
+              };
+            });
+          }
+        } catch (err) {
+          console.error('Failed to load contract items for agent:', err);
+        }
       }
-      if (typeEl) {
-        typeEl.value = agent.discount_type || 'percentage';
-        typeEl.disabled = true;
-      }
-      if (labelEl) {
-        labelEl.value = `Diskon Agen: ${agent.name}`;
-        labelEl.disabled = true;
+
+      const hasContract = agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0;
+
+      // Set discount parameters
+      if (hasContract) {
+        if (discInput) {
+          discInput.value = 0;
+          discInput.disabled = true;
+        }
+        if (typeEl) {
+          typeEl.value = 'nominal';
+          typeEl.disabled = true;
+        }
+        if (labelEl) {
+          labelEl.value = 'Diskon Kontrak Agen';
+          labelEl.disabled = true;
+        }
+      } else {
+        // Fall back to agent global rate
+        if (discInput) {
+          discInput.value = agent.discount_rate;
+          discInput.disabled = true;
+        }
+        if (typeEl) {
+          typeEl.value = agent.discount_type || 'percentage';
+          typeEl.disabled = true;
+        }
+        if (labelEl) {
+          labelEl.value = `Diskon Agen: ${agent.name}`;
+          labelEl.disabled = true;
+        }
       }
       
       // Auto-populate visitor name if empty with agent name
