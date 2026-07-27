@@ -1648,7 +1648,7 @@ function renderContractItems(agentId) {
   const activeTickets = ticketCatalog.filter(t => t.is_active === 1);
   
   if (Object.keys(items).length === 0) {
-    container.innerHTML = '<p class="text-xs text-on-surface-variant text-center py-4">No contract items configured. Click \u0022Add Item\u0022 to start.</p>';
+    container.innerHTML = '<p class="text-xs text-on-surface-variant text-center py-4 italic">No contract items configured. Click "Add Contract Item" to start.</p>';
     return;
   }
 
@@ -1656,18 +1656,29 @@ function renderContractItems(agentId) {
     const ticket = activeTickets.find(t => t.id == ticketId);
     if (!ticket) return '';
     return `
-      <div class="flex items-center gap-2 p-2 bg-surface-container-low border border-outline-variant rounded-lg" data-ticket-id="${ticketId}">
-        <select class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItem('${agentId}', ${ticketId}, this.value)">
-          ${activeTickets.map(t => `<option value="${t.id}" ${t.id == ticketId ? 'selected' : ''}>${t.title}</option>`).join('')}
-        </select>
-        <div class="flex items-center gap-1">
-          <select class="w-[60px] text-xs px-1 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemType('${agentId}', ${ticketId}, this.value)">
-            <option value="percentage" ${data.discount_type === 'percentage' ? 'selected' : ''}>%</option>
-            <option value="nominal" ${data.discount_type === 'nominal' ? 'selected' : ''}>Rp</option>
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm hover:border-primary/40 transition-all" data-ticket-id="${ticketId}">
+        <!-- Ticket Dropdown -->
+        <div class="flex-1">
+          <select class="w-full px-3 py-1.5 border border-outline-variant rounded-lg text-xs focus:outline-none focus:border-primary bg-white text-on-surface font-semibold" onchange="updateContractItem('${agentId}', ${ticketId}, this.value)">
+            ${activeTickets.map(t => `<option value="${t.id}" ${t.id == ticketId ? 'selected' : ''}>${t.title}</option>`).join('')}
           </select>
-          <input type="number" value="${data.discount_rate}" min="0" step="0.5" class="w-20 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemRate('${agentId}', ${ticketId}, this.value)">
         </div>
-        <button type="button" onclick="removeContractItem('${agentId}', ${ticketId})" class="text-error hover:text-on-error p-1" title="Remove"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+        
+        <!-- Discount Inputs Group -->
+        <div class="flex items-center gap-2 justify-between">
+          <div class="flex items-center border border-outline-variant rounded-lg overflow-hidden bg-white focus-within:border-primary transition-all shadow-sm">
+            <select class="w-[50px] px-1 py-1.5 text-center border-r border-outline-variant text-xs focus:outline-none bg-surface-container-low text-on-surface font-bold cursor-pointer" onchange="updateContractItemType('${agentId}', ${ticketId}, this.value)">
+              <option value="percentage" ${data.discount_type === 'percentage' ? 'selected' : ''}>%</option>
+              <option value="nominal" ${data.discount_type === 'nominal' ? 'selected' : ''}>Rp</option>
+            </select>
+            <input type="number" value="${data.discount_rate}" min="0" step="0.5" class="w-20 px-2.5 py-1.5 text-xs font-mono font-black focus:outline-none text-right text-primary bg-transparent" onchange="updateContractItemRate('${agentId}', ${ticketId}, this.value)">
+          </div>
+          
+          <!-- Delete button -->
+          <button type="button" onclick="removeContractItem('${agentId}', ${ticketId})" class="p-1.5 text-error hover:bg-error/10 active:scale-90 rounded-lg transition-all flex items-center justify-center" title="Remove Item">
+            <span class="material-symbols-outlined text-[18px]">delete</span>
+          </button>
+        </div>
       </div>
     `;
   }).join('');
