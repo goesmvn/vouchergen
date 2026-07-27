@@ -1537,8 +1537,14 @@ async function saveAgentForm(event) {
 
     const agentId = id || data.id;
     
-    // Save contract items if editing existing agent
-    if (id && agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0) {
+    // Copy contract items from 'temp' to the new agent ID if it is a new agent
+    if (!id && agentContractItems['temp'] && Object.keys(agentContractItems['temp']).length > 0) {
+      agentContractItems[agentId] = agentContractItems['temp'];
+      delete agentContractItems['temp'];
+    }
+
+    // Save contract items
+    if (agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0) {
       for (const [ticketId, itemData] of Object.entries(agentContractItems[agentId])) {
         await fetch(`/api/agents/${agentId}/contract-items`, {
           method: 'POST',
@@ -1651,17 +1657,17 @@ function renderContractItems(agentId) {
     if (!ticket) return '';
     return `
       <div class="flex items-center gap-2 p-2 bg-surface-container-low border border-outline-variant rounded-lg" data-ticket-id="${ticketId}">
-        <select class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItem(${agentId}, ${ticketId}, this.value)">
+        <select class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItem('${agentId}', ${ticketId}, this.value)">
           ${activeTickets.map(t => `<option value="${t.id}" ${t.id == ticketId ? 'selected' : ''}>${t.title}</option>`).join('')}
         </select>
         <div class="flex items-center gap-1">
-          <select class="w-[60px] text-xs px-1 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemType(${agentId}, ${ticketId}, this.value)">
+          <select class="w-[60px] text-xs px-1 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemType('${agentId}', ${ticketId}, this.value)">
             <option value="percentage" ${data.discount_type === 'percentage' ? 'selected' : ''}>%</option>
             <option value="nominal" ${data.discount_type === 'nominal' ? 'selected' : ''}>Rp</option>
           </select>
-          <input type="number" value="${data.discount_rate}" min="0" step="0.5" class="w-20 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemRate(${agentId}, ${ticketId}, this.value)">
+          <input type="number" value="${data.discount_rate}" min="0" step="0.5" class="w-20 text-xs px-2 py-1 border border-outline-variant rounded focus:outline-none focus:border-primary" onchange="updateContractItemRate('${agentId}', ${ticketId}, this.value)">
         </div>
-        <button type="button" onclick="removeContractItem(${agentId}, ${ticketId})" class="text-error hover:text-on-error p-1" title="Remove"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+        <button type="button" onclick="removeContractItem('${agentId}', ${ticketId})" class="text-error hover:text-on-error p-1" title="Remove"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       </div>
     `;
   }).join('');
@@ -1669,11 +1675,7 @@ function renderContractItems(agentId) {
 
 // Add Contract Item Row
 function addContractItemRow() {
-  const agentId = document.getElementById('store-agent-id').value;
-  if (!agentId) {
-    showToast('Please save agent first before adding contract items', true);
-    return;
-  }
+  const agentId = document.getElementById('store-agent-id').value || 'temp';
   
   const container = document.getElementById('contract-items-container');
   const activeTickets = ticketCatalog.filter(t => t.is_active === 1);
