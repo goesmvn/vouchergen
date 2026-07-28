@@ -344,6 +344,10 @@ async function handleChatbotMessage(from, rawText) {
     } else {
       lang = 'id';
     }
+
+    // Save initial session to persist detected language
+    session = { step: 0, bot_mode: 'bot', ticket_status: 'closed', lang: lang };
+    await saveSession(from, session);
   }
   
   // Direct language commands
