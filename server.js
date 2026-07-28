@@ -1485,26 +1485,7 @@ app.post('/api/helpdesk/sessions/:phone/message', authenticateToken, async (req,
     return res.status(400).json({ error: 'Message text is required' });
   }
   try {
-    const wahaRow = await dbGet("SELECT value FROM settings WHERE key = 'waha_url'");
-    const wahaUrl = (wahaRow && wahaRow.value) || 'http://localhost:3006';
-    const chat_id = phone.includes('@') ? phone : `${phone}@c.us`;
-    const wahaPayload = {
-      session: "default",
-      chatId: chat_id,
-      text: text
-    };
-    
-    console.log(`Sending manual helpdesk message via WAHA: ${wahaUrl}/api/sendText`, wahaPayload);
-    const wahaRes = await fetch(`${wahaUrl}/api/sendText`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(wahaPayload)
-    });
-    
-    if (!wahaRes.ok) {
-      const errText = await wahaRes.text();
-      throw new Error(`WAHA API returned status ${wahaRes.status}: ${errText}`);
-    }
+    await whatsapp.sendManualMessage(phone, text);
     
     const existing = await dbGet('SELECT phone FROM chatbot_sessions WHERE phone = ?', [phone]);
     if (existing) {

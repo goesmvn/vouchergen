@@ -1,0 +1,90 @@
+{
+  "welcome": {
+    "id": "Halo! Selamat datang di WhatsApp *{merchant_name}*. ada yang bisa kami bantu? 😊\n\nSilakan ketik nomor pilihan berikut:\n*1.* Info Tiket & Harga\n*2.* Lokasi & Jam Operasional\n*3.* Cara Pemesanan Tiket\n*4.* Hubungi Customer Service\n\nAtau ketik *PESAN* untuk memesan tiket masuk langsung lewat WhatsApp!",
+    "en": "Hello! Welcome to WhatsApp *{merchant_name}*. How can we help you? 😊\n\nPlease type the number of your choice:\n*1.* Ticket Info & Prices\n*2.* Location & Opening Hours\n*3.* How to Book Tickets\n*4.* Contact Customer Service\n\nOr type *BOOKING* to book tickets directly via WhatsApp!"
+  },
+  "cancel": {
+    "id": "❌ Pemesanan tiket dibatalkan. Jika ada hal lain yang bisa kami bantu, silakan hubungi kami kembali.",
+    "en": "❌ Ticket booking cancelled. If there is anything else we can help you with, please contact us again."
+  },
+  "booking_start": {
+    "id": "Halo! Selamat datang di layanan reservasi otomatis *{merchant_name}*.\n\nSilakan ketik *Nama Lengkap* Anda untuk memulai:",
+    "en": "Hello! Welcome to *{merchant_name}* automated reservation service.\n\nPlease type your *Full Name* to start:"
+  },
+  "no_tickets": {
+    "id": "Maaf, saat ini tidak ada tiket aktif yang dapat dipesan. Silakan hubungi customer service kami.",
+    "en": "Sorry, there are no active tickets available for booking at the moment. Please contact our customer service."
+  },
+  "step1_prompt": {
+    "id": "Hai *{name}*!\n\nSilakan pilih kategori tiket masuk (Ketik nomornya):\n\n{options_text}\nKetik *BATAL* jika ingin membatalkan.",
+    "en": "Hi *{name}*!\n\nPlease select ticket category (Type the number):\n\n{options_text}\nType *CANCEL* to cancel."
+  },
+  "step2_invalid": {
+    "id": "Pilihan nomor tidak valid. Silakan pilih nomor *1* sampai *{count}*, atau ketik *BATAL* untuk keluar.",
+    "en": "Invalid number selection. Please select a number from *1* to *{count}*, or type *CANCEL* to exit."
+  },
+  "step2_prompt": {
+    "id": "Anda memilih tiket:\n*{title}* (Rp {price:,})\n\nBerapa jumlah tiket yang ingin Anda pesan?\n(Ketik angka saja, contoh: *2*)",
+    "en": "You selected ticket:\n*{title}* (Rp {price:,})\n\nHow many tickets would you like to book?\n(Type number only, e.g., *2*)"
+  },
+  "step3_invalid": {
+    "id": "Jumlah tiket tidak valid. Silakan ketik angka lebih besar dari 0 (contoh: *3*).",
+    "en": "Invalid number of tickets. Please type a number greater than 0 (e.g., *3*)."
+  },
+  "step3_prompt": {
+    "id": "Silakan pilih metode pembayaran (Ketik nomornya):\n\n{options_text}\nKetik *BATAL* untuk membatalkan.",
+    "en": "Please select payment method (Type the number):\n\n{options_text}\nType *CANCEL* to cancel."
+  },
+  "step4_invalid": {
+    "id": "Pilihan pembayaran tidak valid. Silakan ketik angka *1* sampai *{count}*.",
+    "en": "Invalid payment selection. Please type a number from *1* to *{count}*."
+  },
+  "step4_prompt": {
+    "id": "Berikut ringkasan pesanan Anda:\n\n• Nama: *{name}*\n• Tiket: *{title}*\n• Jumlah: *{quantity} pcs*\n• Total Bayar: *Rp {total_bill:,}*\n• Pembayaran: *{payment_method}*\n\nApakah data pesanan ini sudah benar?\nKetik *YA* jika setuju, atau *BATAL* jika ingin membatalkan.",
+    "en": "Here is your booking summary:\n\n• Name: *{name}*\n• Ticket: *{title}*\n• Quantity: *{quantity} pcs*\n• Total Bill: *Rp {total_bill:,}*\n• Payment Method: *{payment_method}*\n\nIs this booking information correct?\nType *YES* to confirm, or *CANCEL* to cancel."
+  },
+  "step5_success": {
+    "id": "Pemesanan Berhasil! 🎉\n\n• *Invoice ID*: #{invoice_id}\n• *Voucher Code*: {voucher_code}\n• *Nama*: {name}\n• *Tiket*: {title}\n• *Jumlah*: {quantity} pcs\n• *Total Bayar*: Rp {total_bill:,}\n• *Status*: Belum Lunas (Unpaid){payment_instructions}\n\nSetelah pembayaran lunas, voucher aktif Anda dapat diakses dan diunduh di website kami: http://{merchant_website}/vouchers.html?code={voucher_code}\n\nTerima kasih! Sampai jumpa di Batur Hot Spring.",
+    "en": "Booking Successful! 🎉\n\n• *Invoice ID*: #{invoice_id}\n• *Voucher Code*: {voucher_code}\n• *Name*: {name}\n• *Ticket*: {title}\n• *Quantity*: {quantity} pcs\n• *Total Bill*: Rp {total_bill:,}\n• *Status*: Unpaid{payment_instructions}\n\nOnce payment is completed, your active voucher can be accessed and downloaded on our website: http://{merchant_website}/vouchers.html?code={voucher_code}\n\nThank you! See you at Batur Hot Spring."
+  },
+  "step5_error": {
+    "id": "Maaf, terjadi kesalahan sistem saat membuat pesanan Anda. Silakan coba lagi nanti.",
+    "en": "Sorry, a system error occurred while creating your booking. Please try again later."
+  },
+  "step5_invalid": {
+    "id": "Konfirmasi tidak dikenali. Silakan ketik *YA* untuk konfirmasi pesanan Anda, atau *BATAL* jika ingin membatalkan.",
+    "en": "Confirmation not recognized. Please type *YES* to confirm your booking, or *CANCEL* to cancel."
+  },
+  "ticket_list_header": {
+    "id": "Daftar Harga Tiket Masuk *{merchant_name}*:\n\n",
+    "en": "Ticket Prices for *{merchant_name}*:\n\n"
+  },
+  "ticket_list_empty": {
+    "id": "Saat ini tidak ada kategori tiket aktif.",
+    "en": "There are no active ticket categories at the moment."
+  },
+  "ticket_list_footer": {
+    "id": "Ketik *PESAN* untuk memesan tiket secara langsung.",
+    "en": "Type *BOOKING* to book tickets directly."
+  },
+  "location_info": {
+    "id": "📍 *Alamat & Lokasi {merchant_name}*:\n{merchant_address}\n\n🕒 *Jam Operasional*:\nSetiap hari: 07:00 - 19:00 WITA\n\nWebsite resmi: http://{merchant_website}",
+    "en": "📍 *Address & Location of {merchant_name}*:\n{merchant_address}\n\n🕒 *Opening Hours*:\nEvery day: 07:00 - 19:00 WITA\n\nOfficial website: http://{merchant_website}"
+  },
+  "cs_info": {
+    "id": "📞 *Layanan Pelanggan {merchant_name}*:\n\nPesan Anda telah diteruskan ke Customer Service (CS).\nSistem chatbot dijeda sementara. Admin kami akan segera membalas pesan Anda di sini.\n\nHubungi langsung jika darurat:\n• Telepon: {merchant_phone}\n• Email: {merchant_email}",
+    "en": "📞 *Customer Service for {merchant_name}*:\n\nYour message has been forwarded to Customer Service (CS).\nThe chatbot is temporarily paused. Our admin will reply to your message here shortly.\n\nContact directly for emergencies:\n• Phone: {merchant_phone}\n• Email: {merchant_email}"
+  },
+  "cara_booking": {
+    "id": "💡 *Cara Pemesanan Tiket*:\n\n1. Ketik *PESAN* di chat ini untuk melakukan pemesanan instan.\n2. Isi Nama, pilih kategori tiket, jumlah tiket, dan metode pembayaran.\n3. Lakukan transfer sesuai instruksi yang diberikan.\n4. Konfirmasi pembayaran Anda ke admin melalui chat ini.\n5. Setelah lunas, Anda akan mendapatkan voucher dengan kode QR unik.\n\nAnda juga bisa memesan tiket langsung di website kami: http://{merchant_website}",
+    "en": "💡 *How to Book Tickets*:\n\n1. Type *BOOKING* in this chat to start instant booking.\n2. Fill in your Name, select ticket category, quantity, and payment method.\n3. Transfer payment according to instructions.\n4. Confirm payment to admin via this chat.\n5. Once paid, you will receive a voucher with a unique QR code.\n\nYou can also book tickets directly on our website: http://{merchant_website}"
+  },
+  "cash_instruction": {
+    "id": "\n\nSilakan tunjukkan Invoice ID Anda saat kedatangan di loket kami untuk pembayaran.",
+    "en": "\n\nPlease show your Invoice ID at our counter to pay upon arrival."
+  },
+  "transfer_instruction": {
+    "id": "\n\nSilakan transfer ke *{bank_name}* a/n *{merchant_name}*.",
+    "en": "\n\nPlease transfer to *{bank_name}* a/n *{merchant_name}*."
+  }
+}

@@ -19,7 +19,7 @@ COPY package*.json ./
 RUN npm install --omit=dev --build-from-source
 
 # Copy application source files
-COPY server.js whatsapp.js ./
+COPY server.js whatsapp.js t_dict.json company_knowledge.txt ./
 COPY public/ ./public/
 
 # Expose server port
