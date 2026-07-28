@@ -446,7 +446,7 @@ async function handleChatbotMessage(from, rawText) {
       session.step = 3;
       await saveSession(from, session);
       
-      const reply = T.step2_prompt[lang].replace('{title}', session.ticket.title.trim()).replace('{price}', Math.round(session.ticket.price).toLocaleString('id-ID'));
+      const reply = T.step2_prompt[lang].replace('{title}', session.ticket.title.trim()).replace('{price:,}', Math.round(session.ticket.price).toLocaleString('id-ID'));
       await sock.sendMessage(from, { text: reply });
       await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
       return;
@@ -496,7 +496,7 @@ async function handleChatbotMessage(from, rawText) {
         .replace('{name}', session.name)
         .replace('{title}', session.ticket.title.trim())
         .replace('{quantity}', session.quantity)
-        .replace('{total_bill}', Math.round(totalBill).toLocaleString('id-ID'))
+        .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
         .replace('{payment_method}', session.paymentMethod);
         
       await sock.sendMessage(from, { text: reply });
@@ -547,7 +547,7 @@ async function handleChatbotMessage(from, rawText) {
             .replace('{name}', session.name)
             .replace('{title}', session.ticket.title.trim())
             .replace('{quantity}', session.quantity)
-            .replace('{total_bill}', Math.round(totalBill).toLocaleString('id-ID'))
+            .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
             .replace('{payment_instructions}', paymentInstructions)
             .replace('{merchant_website}', merchantWebsite);
             
