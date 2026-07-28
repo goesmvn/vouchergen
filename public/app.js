@@ -340,6 +340,7 @@ function setupEventListeners() {
         nvidia_api_key: document.getElementById('settings-nvidia-key').value.trim(),
         nvidia_model: document.getElementById('settings-nvidia-model').value.trim(),
         ai_base_url: document.getElementById('settings-ai-base-url').value.trim(),
+        chatbot_knowledge: document.getElementById('settings-chatbot-knowledge').value.trim(),
         waha_url: document.getElementById('settings-waha-url').value.trim(),
         primary_color: document.getElementById('settings-primary-color-text').value.trim(),
         secondary_color: document.getElementById('settings-secondary-color-text').value.trim(),
@@ -1149,6 +1150,7 @@ function renderSettingsForm() {
   document.getElementById('settings-nvidia-key').value = appSettings.nvidia_api_key || '';
   document.getElementById('settings-nvidia-model').value = appSettings.nvidia_model || 'nvidia/llama-3.1-nemotron-70b-instruct';
   document.getElementById('settings-ai-base-url').value = appSettings.ai_base_url || 'https://integrate.api.nvidia.com/v1/chat/completions';
+  document.getElementById('settings-chatbot-knowledge').value = appSettings.chatbot_knowledge || '';
   document.getElementById('settings-waha-url').value = appSettings.waha_url || '';
   document.getElementById('settings-primary-color').value = appSettings.primary_color || '#000000';
   document.getElementById('settings-primary-color-text').value = appSettings.primary_color || '#000000';

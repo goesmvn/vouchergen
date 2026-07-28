@@ -1710,6 +1710,14 @@
                     <span class="text-[10px] text-on-surface-variant">Model name for the provider.</span>
                   </div>
                 </div>
+
+                <!-- Chatbot Knowledge Base Textarea -->
+                <div class="flex flex-col gap-1.5 pt-2">
+                  <label for="settings-chatbot-knowledge" class="text-xs font-bold uppercase text-on-surface-variant">Chatbot Knowledge Base (RAG Data)</label>
+                  <textarea id="settings-chatbot-knowledge" rows="8" placeholder="Masukkan seluruh informasi / FAQ tempat wisata Anda di sini..." class="w-full px-4 py-3 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm"></textarea>
+                  <span class="text-[10px] text-on-surface-variant">Data ini akan dipotong per paragraf oleh sistem untuk dicari kemiripannya dengan pertanyaan pelanggan (RAG Context).</span>
+                </div>
+
                 <p class="text-xs text-on-surface-variant">Supports standard OpenAI-compatible endpoints (OpenAI, Gemini, Groq, DeepSeek, OpenRouter, etc.). Leave API Key blank to use rule-based static FAQ chatbot.</p>
               </div>
 
@@ -2295,6 +2303,6 @@
   <div id="toast-notification" class="toast hidden"></div>
 
   <!-- Script logic -->
-  <script src="app.js?v=1.0.9"></script>
+  <script src="app.js?v=1.1.0"></script>
 </body>
 </html>

@@ -267,24 +267,6 @@ async function deleteSession(jid) {
   );
 }
 
-// Load company knowledge base on startup
-let knowledgeParagraphs = [];
-try {
-  const kbPath = path.join(__dirname, 'chatbot', 'company_knowledge.txt');
-  if (fs.existsSync(kbPath)) {
-    const content = fs.readFileSync(kbPath, 'utf8');
-    knowledgeParagraphs = content.split('\n\n').map(p => p.trim()).filter(Boolean);
-  } else {
-    const kbPathAlternative = path.join(__dirname, 'company_knowledge.txt');
-    if (fs.existsSync(kbPathAlternative)) {
-      const content = fs.readFileSync(kbPathAlternative, 'utf8');
-      knowledgeParagraphs = content.split('\n\n').map(p => p.trim()).filter(Boolean);
-    }
-  }
-} catch (e) {
-  console.error('Failed to load knowledge base:', e.message);
-}
-
 // Tokenize helper for similarity search
 function tokenize(text) {
   return text.toLowerCase().match(/\w+/g) || [];
@@ -664,7 +646,9 @@ async function handleChatbotMessage(from, rawText) {
   
   if (nvidiaKey) {
     try {
-      const context = getRelevantContext(rawText, knowledgeParagraphs, 3);
+      const kbContent = settings.chatbot_knowledge || '';
+      const paragraphs = kbContent.split('\n\n').map(p => p.trim()).filter(Boolean);
+      const context = getRelevantContext(rawText, paragraphs, 3);
       const tickets = await dbAll("SELECT * FROM tickets WHERE is_active = 1");
       let ticketContext = "";
       tickets.forEach(t => {
