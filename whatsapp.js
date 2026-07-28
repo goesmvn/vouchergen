@@ -340,14 +340,27 @@ async function handleChatbotMessage(from, rawText) {
   
   let session = await getSession(from);
   
-  // Language detection
+  // Language detection (dynamic token scoring)
   let lang = 'id';
   if (session && session.lang) {
     lang = session.lang;
   } else {
-    const enIndicators = ['english', 'en', 'hello', 'hi', 'hey', 'booking', 'ticket', 'price', 'location', 'hours', 'help'];
-    if (enIndicators.some(w => text.includes(w))) {
+    const idWords = ['halo', 'pagi', 'siang', 'sore', 'malam', 'pesan', 'tiket', 'harga', 'lokasi', 'buka', 'tanya', 'bantu', 'cara', 'bayar', 'transfer', 'tunai', 'qris', 'alamat', 'dimana', 'berapa', 'siapa', 'info', 'wisata'];
+    const enWords = ['hello', 'hi', 'hey', 'morning', 'afternoon', 'evening', 'book', 'booking', 'ticket', 'price', 'rate', 'location', 'open', 'close', 'hours', 'help', 'support', 'how', 'pay', 'transfer', 'cash', 'address', 'where', 'much', 'who', 'info', 'tourism'];
+    
+    let idScore = 0;
+    let enScore = 0;
+    
+    const tokens = tokenize(text);
+    tokens.forEach(token => {
+      if (idWords.includes(token)) idScore++;
+      if (enWords.includes(token)) enScore++;
+    });
+    
+    if (enScore > idScore) {
       lang = 'en';
+    } else {
+      lang = 'id';
     }
   }
   
