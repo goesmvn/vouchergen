@@ -446,7 +446,7 @@ async function handleChatbotMessage(from, rawText) {
       session.step = 3;
       await saveSession(from, session);
       
-      const reply = T.step2_prompt[lang].replace('{title}', session.ticket.title).replace('{price}', Math.round(session.ticket.price).toLocaleString('id-ID'));
+      const reply = T.step2_prompt[lang].replace('{title}', session.ticket.title.trim()).replace('{price}', Math.round(session.ticket.price).toLocaleString('id-ID'));
       await sock.sendMessage(from, { text: reply });
       await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
       return;
@@ -494,7 +494,7 @@ async function handleChatbotMessage(from, rawText) {
       const totalBill = (session.ticket.price - (session.ticket.discount || 0)) * session.quantity;
       const reply = T.step4_prompt[lang]
         .replace('{name}', session.name)
-        .replace('{title}', session.ticket.title)
+        .replace('{title}', session.ticket.title.trim())
         .replace('{quantity}', session.quantity)
         .replace('{total_bill}', Math.round(totalBill).toLocaleString('id-ID'))
         .replace('{payment_method}', session.paymentMethod);
@@ -545,7 +545,7 @@ async function handleChatbotMessage(from, rawText) {
             .replace('{invoice_id}', resInvoice.id)
             .replace('{voucher_code}', voucherCode)
             .replace('{name}', session.name)
-            .replace('{title}', session.ticket.title)
+            .replace('{title}', session.ticket.title.trim())
             .replace('{quantity}', session.quantity)
             .replace('{total_bill}', Math.round(totalBill).toLocaleString('id-ID'))
             .replace('{payment_instructions}', paymentInstructions)
@@ -596,7 +596,7 @@ async function handleChatbotMessage(from, rawText) {
       ticketList += T.ticket_list_empty[lang];
     } else {
       tickets.forEach((t, idx) => {
-        ticketList += `*${idx + 1}. ${t.title}*\n`;
+        ticketList += `*${idx + 1}. ${t.title.trim()}*\n`;
         ticketList += lang === 'en' ? `   Price: Rp ${Math.round(t.price).toLocaleString('id-ID')}\n` : `   Harga: Rp ${Math.round(t.price).toLocaleString('id-ID')}\n`;
         if (t.description) ticketList += `   Detail: ${t.description}\n`;
         ticketList += "\n";
