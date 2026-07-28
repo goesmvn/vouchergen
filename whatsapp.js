@@ -657,9 +657,10 @@ async function handleChatbotMessage(from, rawText) {
     return;
   }
   
-  // RAG with NVIDIA AI
+  // RAG with LLM AI (OpenAI-compatible)
   const nvidiaKey = settings.nvidia_api_key || '';
   const nvidiaModel = settings.nvidia_model || 'nvidia/llama-3.1-nemotron-70b-instruct';
+  const aiBaseUrl = settings.ai_base_url || 'https://integrate.api.nvidia.com/v1/chat/completions';
   
   if (nvidiaKey) {
     try {
@@ -677,7 +678,7 @@ async function handleChatbotMessage(from, rawText) {
         systemInstruction = `Kamu adalah Virtual Assistant WhatsApp resmi untuk ${merchantName} (${merchantWebsite}).\nTugasmu adalah membantu pelanggan menjawab pertanyaan dengan sopan dan ramah dalam bahasa yang mereka gunakan (Indonesia, Inggris, Bali, dll.).\n\nGunakan informasi/konteks resmi dari perusahaan berikut untuk menjawab pertanyaan:\n[KONTEKS PERUSAHAAN]\n${context || 'Tidak ada konteks spesifik.'}\n[/KONTEKS PERUSAHAAN]\n\nDaftar Tiket Aktif & Harga:\n${ticketContext}\nKetentuan Pemesanan:\n- Pelanggan bisa memesan tiket langsung lewat WhatsApp dengan mengetik kata kunci \"PESAN\" atau \"BOOKING\".\n- Jika pelanggan ingin memesan tiket, arahkan mereka untuk mengetik \"PESAN\" agar sistem otomatis memandu langkah pemesanan. Jangan lakukan pemesanan manual lewat percakapan AI biasa.\n\nAturan Jawaban:\n- Jawab dengan singkat, padat, dan ramah.\n- Gunakan emoji yang sesuai.\n- Hanya jawab berdasarkan konteks perusahaan yang disediakan. Jika tidak tahu atau tidak ada di konteks, jawab bahwa Anda tidak tahu dan arahkan untuk menghubungi CS di ${merchantPhone}.\n- Jawab menggunakan bahasa yang sama dengan pesan pelanggan.`;
       }
       
-      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      const response = await fetch(aiBaseUrl, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",

@@ -301,6 +301,7 @@ async function initializeDatabase() {
       { key: 'ninerouter_model', value: 'gpt-4o-mini' },
       { key: 'nvidia_api_key', value: '' },
       { key: 'nvidia_model', value: 'nvidia/llama-3.1-nemotron-70b-instruct' },
+      { key: 'ai_base_url', value: 'https://integrate.api.nvidia.com/v1/chat/completions' },
       { key: 'waha_url', value: 'http://localhost:3006' },
       { key: 'primary_color', value: '#000000' },
       { key: 'secondary_color', value: '#006c4a' },
