@@ -2838,7 +2838,7 @@ async function processBookingSubmit(payDirectly = false) {
       
       discRate = contractDiscountAmt;
       discType = 'nominal';
-      discLabel = 'Diskon Kontrak Agen';
+      discLabel = appSettings.discount_label || 'Diskon';
     }
 
     const response = await fetch(url, {
@@ -3161,7 +3161,7 @@ async function openMultiInvoiceDetails(invoiceIds) {
               <span class="font-code-mono whitespace-nowrap">- Rp ${totalTicketDiscount.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.discountRate > 0 ? `<div class="flex justify-between font-body-md text-emerald-600">
-              <span>${discLabel} (${p.discountRate}%):</span>
+              <span>${discLabel}${p.discountType === 'percentage' ? ` (${p.discountRate}%)` : ''}:</span>
               <span class="font-code-mono whitespace-nowrap">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.taxRate > 0 ? `<div class="flex justify-between font-body-md text-on-surface">
@@ -3368,7 +3368,7 @@ async function openInvoiceDetails(invoiceId) {
             </div>` : ''}
             ${p.discountRate > 0 ? `
             <div class="total-row discount flex justify-between text-green-600">
-              <span>${discLabel} (${p.discountRate}%)</span>
+              <span>${discLabel}${p.discountType === 'percentage' ? ` (${p.discountRate}%)` : ''}</span>
               <span class="amount font-mono whitespace-nowrap">- Rp ${p.discountAmt.toLocaleString('id-ID')}</span>
             </div>` : ''}
             ${p.taxRate > 0 ? `
