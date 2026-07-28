@@ -226,9 +226,7 @@ async function getSession(jid) {
   }
   
   session.availableTickets = await dbAll("SELECT * FROM tickets WHERE is_active = 1");
-  
-  const activePayments = await dbAll("SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY name ASC");
-  session.availablePayments = activePayments.length > 0 ? activePayments : [{ name: 'Tunai' }, { name: 'Transfer Bank' }, { name: 'QRIS' }];
+  session.availablePayments = [{ name: 'PayPal' }, { name: 'Transfer Bank' }];
   
   return session;
 }
@@ -533,10 +531,11 @@ async function handleChatbotMessage(from, rawText) {
           await deleteSession(from);
           
           let paymentInstructions = "";
-          if (session.paymentMethod.includes("BCA")) {
-            paymentInstructions = T.transfer_instruction[lang].replace('{bank_name}', 'BCA 123-456-7890').replace('{merchant_name}', merchantName);
-          } else if (session.paymentMethod.includes("Mandiri")) {
-            paymentInstructions = T.transfer_instruction[lang].replace('{bank_name}', 'Mandiri 987-654-3210').replace('{merchant_name}', merchantName);
+          if (session.paymentMethod === 'PayPal') {
+            paymentInstructions = `\n\n${lang === 'en' ? 'Please send your payment to our PayPal email' : 'Silakan kirim pembayaran Anda ke email PayPal kami'}:\n*${merchantEmail}*`;
+          } else if (session.paymentMethod === 'Transfer Bank') {
+            const inst = settings.merchant_payment_instructions || 'Bank Transfer Jago';
+            paymentInstructions = `\n\n${lang === 'en' ? 'Please transfer to' : 'Silakan transfer ke'}:\n*${inst}*`;
           } else {
             paymentInstructions = T.cash_instruction[lang];
           }

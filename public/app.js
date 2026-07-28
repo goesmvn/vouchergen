@@ -510,9 +510,9 @@ function switchTab(tabId) {
   if (tabId === 'agents') loadAgents();
   if (tabId === 'users') loadUsers();
   if (tabId === 'generator') { renderBookingCatalog(); initVisitDateInput(); updateBookingTotal(); }
-  if (tabId === 'invoices') renderInvoicesTable();
+  if (tabId === 'invoices') { loadInvoices().then(renderInvoicesTable); }
   if (tabId === 'vouchers') renderVouchersList();
-  if (tabId === 'orders') renderOrdersTable();
+  if (tabId === 'orders') { loadInvoices().then(renderOrdersTable); }
   if (tabId === 'settings') renderSettingsForm();
   
   if (tabId === 'whatsapp') {
