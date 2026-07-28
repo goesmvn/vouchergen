@@ -1688,26 +1688,39 @@
                   <span class="material-symbols-outlined text-[16px]">smart_toy</span>
                   AI Chatbot Configuration (RAG)
                 </h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <!-- AI API Endpoint / Base URL -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <!-- AI Provider Selector -->
                   <div class="flex flex-col gap-1.5">
+                    <label for="settings-ai-provider" class="text-xs font-bold uppercase text-on-surface-variant">AI Provider</label>
+                    <select id="settings-ai-provider" onchange="onAIProviderChange()" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm bg-white">
+                      <option value="nvidia">NVIDIA NIM API (Default)</option>
+                      <option value="gemini">Google Gemini (Free Tier)</option>
+                      <option value="groq">Groq Cloud (Fast)</option>
+                      <option value="openai">OpenAI Official</option>
+                      <option value="deepseek">DeepSeek Official</option>
+                      <option value="custom">Custom Endpoint</option>
+                    </select>
+                  </div>
+
+                  <!-- AI API Endpoint / Base URL -->
+                  <div class="flex flex-col gap-1.5" id="container-ai-base-url">
                     <label for="settings-ai-base-url" class="text-xs font-bold uppercase text-on-surface-variant">API Endpoint URL</label>
                     <input type="url" id="settings-ai-base-url" placeholder="e.g. https://api.openai.com/v1/chat/completions" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm">
-                    <span class="text-[10px] text-on-surface-variant">Default: NVIDIA NIM API</span>
                   </div>
 
                   <!-- API Key -->
                   <div class="flex flex-col gap-1.5">
                     <label for="settings-nvidia-key" class="text-xs font-bold uppercase text-on-surface-variant">API Key / Token</label>
                     <input type="password" id="settings-nvidia-key" placeholder="Enter API Key" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm">
-                    <span class="text-[10px] text-on-surface-variant">Works with OpenAI, Gemini, Groq, etc.</span>
                   </div>
 
                   <!-- Model Name -->
                   <div class="flex flex-col gap-1.5">
                     <label for="settings-nvidia-model" class="text-xs font-bold uppercase text-on-surface-variant">Model Name</label>
-                    <input type="text" id="settings-nvidia-model" placeholder="e.g. gpt-4o-mini, gemini-2.5-flash" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm">
-                    <span class="text-[10px] text-on-surface-variant">Model name for the provider.</span>
+                    <select id="settings-ai-model-select" onchange="onAIModelChange()" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm bg-white">
+                      <!-- Populated dynamically -->
+                    </select>
+                    <input type="text" id="settings-nvidia-model" placeholder="Model Name" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-sm mt-1.5 hidden">
                   </div>
                 </div>
 
@@ -2303,6 +2316,6 @@
   <div id="toast-notification" class="toast hidden"></div>
 
   <!-- Script logic -->
-  <script src="app.js?v=1.1.0"></script>
+  <script src="app.js?v=1.1.1"></script>
 </body>
 </html>

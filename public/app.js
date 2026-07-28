@@ -1148,10 +1148,19 @@ function renderSettingsForm() {
   document.getElementById('settings-terms').value = appSettings.merchant_terms || '';
   document.getElementById('settings-payment-instructions').value = appSettings.merchant_payment_instructions || '';
   document.getElementById('settings-nvidia-key').value = appSettings.nvidia_api_key || '';
-  document.getElementById('settings-nvidia-model').value = appSettings.nvidia_model || 'nvidia/llama-3.1-nemotron-70b-instruct';
-  document.getElementById('settings-ai-base-url').value = appSettings.ai_base_url || 'https://integrate.api.nvidia.com/v1/chat/completions';
+  
+  const baseUrl = appSettings.ai_base_url || 'https://integrate.api.nvidia.com/v1/chat/completions';
+  document.getElementById('settings-ai-base-url').value = baseUrl;
   document.getElementById('settings-chatbot-knowledge').value = appSettings.chatbot_knowledge || '';
   document.getElementById('settings-waha-url').value = appSettings.waha_url || '';
+  
+  // Detect and set AI Provider dropdown
+  const provider = detectAIProvider(baseUrl);
+  document.getElementById('settings-ai-provider').value = provider;
+  
+  // Populate model dropdown and set value
+  onAIProviderChange(appSettings.nvidia_model || '');
+
   document.getElementById('settings-primary-color').value = appSettings.primary_color || '#000000';
   document.getElementById('settings-primary-color-text').value = appSettings.primary_color || '#000000';
   document.getElementById('settings-secondary-color').value = appSettings.secondary_color || '#006c4a';
@@ -1165,6 +1174,120 @@ function renderSettingsForm() {
   if (discTypeEl) discTypeEl.value = appSettings.discount_type || 'percentage';
   document.getElementById('settings-discount-label').value = appSettings.discount_label || 'Diskon';
 }
+
+// Detect AI Provider from Endpoint URL
+function detectAIProvider(url) {
+  if (url.includes('nvidia.com')) return 'nvidia';
+  if (url.includes('googleapis.com')) return 'gemini';
+  if (url.includes('groq.com')) return 'groq';
+  if (url.includes('openai.com')) return 'openai';
+  if (url.includes('deepseek.com')) return 'deepseek';
+  return 'custom';
+}
+
+// Handle AI Provider dropdown change
+window.onAIProviderChange = function(presetModel = '') {
+  const provider = document.getElementById('settings-ai-provider').value;
+  const baseUrlInput = document.getElementById('settings-ai-base-url');
+  const modelSelect = document.getElementById('settings-ai-model-select');
+  const customModelInput = document.getElementById('settings-nvidia-model');
+  const containerBaseUrl = document.getElementById('container-ai-base-url');
+
+  const providerUrls = {
+    nvidia: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    groq: 'https://api.groq.com/openai/v1/chat/completions',
+    openai: 'https://api.openai.com/v1/chat/completions',
+    deepseek: 'https://api.deepseek.com/v1/chat/completions'
+  };
+
+  const providerModels = {
+    nvidia: [{ value: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'llama-3.1-nemotron-70b-instruct' }],
+    gemini: [
+      { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash (Recommended/Free)' },
+      { value: 'gemini-1.5-flash', label: 'gemini-1.5-flash' },
+      { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }
+    ],
+    groq: [
+      { value: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile' },
+      { value: 'mixtral-8x7b-32768', label: 'mixtral-8x7b-32768' },
+      { value: 'gemma2-9b-it', label: 'gemma2-9b-it' }
+    ],
+    openai: [
+      { value: 'gpt-4o-mini', label: 'gpt-4o-mini (Cheap)' },
+      { value: 'gpt-4o', label: 'gpt-4o' }
+    ],
+    deepseek: [
+      { value: 'deepseek-chat', label: 'deepseek-chat (DeepSeek-V3)' },
+      { value: 'deepseek-reasoner', label: 'deepseek-reasoner (DeepSeek-R1)' }
+    ]
+  };
+
+  // Set Endpoint URL automatically
+  if (provider !== 'custom') {
+    baseUrlInput.value = providerUrls[provider];
+    containerBaseUrl.classList.add('opacity-60', 'pointer-events-none'); // Lock for preset providers
+  } else {
+    containerBaseUrl.classList.remove('opacity-60', 'pointer-events-none'); // Unlock for custom
+  }
+
+  // Populate models list
+  modelSelect.innerHTML = '';
+  if (provider !== 'custom' && providerModels[provider]) {
+    providerModels[provider].forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.value;
+      opt.innerText = m.label;
+      modelSelect.appendChild(opt);
+    });
+    
+    // Add custom model option at the end
+    const optCustom = document.createElement('option');
+    optCustom.value = 'custom';
+    optCustom.innerText = 'Custom Model...';
+    modelSelect.appendChild(optCustom);
+
+    // Set preset model or default to first
+    const hasPreset = providerModels[provider].some(m => m.value === presetModel);
+    if (presetModel && hasPreset) {
+      modelSelect.value = presetModel;
+      customModelInput.classList.add('hidden');
+    } else if (presetModel && !hasPreset) {
+      modelSelect.value = 'custom';
+      customModelInput.value = presetModel;
+      customModelInput.classList.remove('hidden');
+    } else {
+      modelSelect.selectedIndex = 0;
+      customModelInput.classList.add('hidden');
+    }
+  } else {
+    // Custom Provider
+    const optCustom = document.createElement('option');
+    optCustom.value = 'custom';
+    optCustom.innerText = 'Custom Model...';
+    modelSelect.appendChild(optCustom);
+    modelSelect.value = 'custom';
+    
+    customModelInput.value = presetModel || '';
+    customModelInput.classList.remove('hidden');
+  }
+};
+
+// Handle AI Model dropdown change
+window.onAIModelChange = function() {
+  const modelSelect = document.getElementById('settings-ai-model-select');
+  const customModelInput = document.getElementById('settings-nvidia-model');
+  
+  if (modelSelect.value === 'custom') {
+    customModelInput.classList.remove('hidden');
+    if (!customModelInput.value) {
+      customModelInput.value = '';
+    }
+  } else {
+    customModelInput.classList.add('hidden');
+    customModelInput.value = modelSelect.value;
+  }
+};
 
 // Confirm Invoice payment
 async function confirmPayment(invoiceId) {
