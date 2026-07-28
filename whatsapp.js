@@ -138,7 +138,7 @@ async function connectToWhatsApp() {
     const { connection, lastDisconnect, qr } = update;
     
     if (qr) {
-      statusCache.status = 'connecting';
+      statusCache.status = 'qrcode';
       try {
         statusCache.qr = await QRCode.toDataURL(qr);
       } catch (err) {
