@@ -520,6 +520,12 @@ function switchTab(tabId) {
   } else {
     stopWhatsAppPolling();
   }
+
+  if (tabId === 'helpdesk') {
+    startHelpdeskPolling();
+  } else {
+    stopHelpdeskPolling();
+  }
   
   // Auto-hide mobile sidebar
   const sidebar = document.querySelector('.sidebar');
@@ -4864,5 +4870,265 @@ async function deleteInvoiceFromModal(invoiceId) {
     showToast(err.message, true);
   } finally {
     showLoading(false);
+  }
+}
+
+// Helpdesk Variables
+let helpdeskChats = [];
+let activeChatPhone = null;
+let helpdeskPollInterval = null;
+
+// Fetch Helpdesk Chats List
+async function loadHelpdeskChats(silent = false) {
+  try {
+    const res = await fetch('/api/helpdesk/chats', {
+      headers: { 'Authorization': token }
+    });
+    if (!res.ok) return;
+    helpdeskChats = await res.json();
+    renderHelpdeskChatsList();
+  } catch (err) {
+    console.error('Failed to load helpdesk chats:', err);
+  }
+}
+
+// Render Left Panel Chat List
+function renderHelpdeskChatsList() {
+  const container = document.getElementById('helpdesk-chat-list');
+  if (!container) return;
+
+  const searchQuery = document.getElementById('helpdesk-chat-search')?.value.toLowerCase() || '';
+  const filtered = helpdeskChats.filter(chat => 
+    chat.phone.toLowerCase().includes(searchQuery) || 
+    (chat.name && chat.name.toLowerCase().includes(searchQuery)) ||
+    (chat.ticket_subject && chat.ticket_subject.toLowerCase().includes(searchQuery))
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p class="text-xs text-on-surface-variant text-center py-8">No chats found.</p>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(chat => {
+    const isActive = activeChatPhone === chat.phone;
+    const displayName = chat.name || `WhatsApp User (${chat.phone})`;
+    const lastMsgText = chat.last_message || chat.last_reply || 'No messages yet';
+    const timestampStr = chat.last_activity ? new Date(chat.last_activity).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+    
+    // Mode badge
+    const isBot = chat.bot_mode === 'bot';
+    const botBadgeClass = isBot ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary';
+    const botBadgeText = isBot ? 'Bot' : 'Manual';
+
+    // Status badge
+    const isOpen = chat.ticket_status === 'open';
+    const statusBadgeClass = isOpen ? 'badge-unpaid' : 'badge-paid';
+    const statusBadgeText = isOpen ? 'OPEN' : 'CLOSED';
+
+    return `
+      <div onclick="openHelpdeskChat('${chat.phone}')" class="p-4 cursor-pointer hover:bg-surface-container-high transition-colors ${isActive ? 'bg-surface-container-high border-r-4 border-primary' : ''}">
+        <div class="flex justify-between items-start mb-1">
+          <span class="font-bold text-xs text-on-surface truncate pr-2 max-w-[150px]">${displayName}</span>
+          <span class="text-[10px] text-on-surface-variant whitespace-nowrap">${timestampStr}</span>
+        </div>
+        <div class="text-[11px] text-on-surface-variant truncate mb-2">${lastMsgText}</div>
+        <div class="flex gap-1.5 items-center">
+          <span class="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${botBadgeClass}">${botBadgeText}</span>
+          <span class="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${statusBadgeClass}">${statusBadgeText}</span>
+          ${chat.ticket_subject ? `<span class="text-[9px] text-on-surface-variant truncate max-w-[100px]" title="${chat.ticket_subject}">• ${chat.ticket_subject}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Filter chats list on search input
+window.filterHelpdeskChats = function() {
+  renderHelpdeskChatsList();
+};
+
+// Open Specific Chat Details
+window.openHelpdeskChat = async function(phone) {
+  activeChatPhone = phone;
+  
+  // Hide empty state, show chat window
+  document.getElementById('helpdesk-empty-state').classList.add('hidden');
+  document.getElementById('helpdesk-chat-window').classList.remove('hidden');
+  
+  // Update header info
+  document.getElementById('helpdesk-chat-phone').innerText = `+${phone}`;
+  document.getElementById('helpdesk-chat-name').innerText = 'Loading...';
+  
+  // Highlighting active list item
+  renderHelpdeskChatsList();
+
+  await refreshActiveHelpdeskChat();
+};
+
+// Refresh Active Chat (called on open and during polling)
+async function refreshActiveHelpdeskChat() {
+  if (!activeChatPhone) return;
+
+  try {
+    const res = await fetch(`/api/helpdesk/chats/${activeChatPhone}`, {
+      headers: { 'Authorization': token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    
+    // Set customer name
+    const displayName = data.session?.name || 'WhatsApp User';
+    document.getElementById('helpdesk-chat-name').innerText = displayName;
+
+    // Toggle Bot button state
+    const botBtn = document.getElementById('helpdesk-toggle-bot-btn');
+    const isBot = data.session?.bot_mode === 'bot';
+    if (botBtn) {
+      botBtn.innerText = isBot ? 'Auto (Bot)' : 'Manual (Agent)';
+      botBtn.className = `badge cursor-pointer hover:opacity-80 transition-opacity ${isBot ? 'bg-primary text-on-primary' : 'bg-secondary text-on-secondary'}`;
+    }
+
+    // Toggle Ticket button state
+    const ticketBtn = document.getElementById('helpdesk-toggle-ticket-btn');
+    const isOpen = data.session?.ticket_status === 'open';
+    if (ticketBtn) {
+      ticketBtn.innerText = isOpen ? 'Open Ticket' : 'Closed';
+      ticketBtn.className = `badge cursor-pointer hover:opacity-80 transition-opacity ${isOpen ? 'badge-unpaid' : 'badge-paid'}`;
+    }
+
+    // Render Conversation Logs
+    const historyContainer = document.getElementById('helpdesk-chat-history');
+    if (historyContainer) {
+      if (data.logs.length === 0) {
+        historyContainer.innerHTML = '<p class="text-xs text-on-surface-variant text-center py-8">No messages exchanged yet.</p>';
+      } else {
+        const atBottom = historyContainer.scrollHeight - historyContainer.scrollTop <= historyContainer.clientHeight + 40;
+        
+        historyContainer.innerHTML = data.logs.map(log => {
+          const isIncoming = log.message && log.message.trim() !== '';
+          const msgText = isIncoming ? log.message : log.reply;
+          const bubbleClass = isIncoming 
+            ? 'bg-surface-container-high text-on-surface self-start rounded-tl-none mr-12' 
+            : 'bg-primary text-on-primary self-end rounded-tr-none ml-12';
+            
+          const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+          
+          return `
+            <div class="flex flex-col max-w-[85%] ${isIncoming ? 'self-start' : 'self-end'} space-y-1">
+              <div class="px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${bubbleClass}">
+                ${msgText.replace(/\n/g, '<br>')}
+              </div>
+              <span class="text-[9px] text-on-surface-variant ${isIncoming ? 'self-start pl-1' : 'self-end pr-1'}">${timeStr}</span>
+            </div>
+          `;
+        }).join('');
+
+        // Auto scroll to bottom on new messages
+        if (atBottom) {
+          historyContainer.scrollTop = historyContainer.scrollHeight;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error refreshing helpdesk chat:', err);
+  }
+}
+
+// Toggle Bot Mode (Auto vs Manual)
+window.toggleChatbotMode = async function() {
+  if (!activeChatPhone) return;
+  
+  const botBtn = document.getElementById('helpdesk-toggle-bot-btn');
+  const isCurrentlyBot = botBtn.innerText.includes('Auto');
+  const nextMode = isCurrentlyBot ? 'agent' : 'bot';
+  
+  try {
+    const res = await fetch(`/api/helpdesk/sessions/${activeChatPhone}/toggle-bot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ bot_mode: nextMode })
+    });
+    if (res.ok) {
+      showToast(`Mode Chatbot diubah ke: ${nextMode.toUpperCase()}`);
+      await refreshActiveHelpdeskChat();
+      await loadHelpdeskChats(true);
+    }
+  } catch (err) {
+    showToast('Failed to toggle bot mode', true);
+  }
+};
+
+// Toggle Ticket Status (Open vs Closed)
+window.toggleTicketStatus = async function() {
+  if (!activeChatPhone) return;
+  
+  const ticketBtn = document.getElementById('helpdesk-toggle-ticket-btn');
+  const isCurrentlyOpen = ticketBtn.innerText.includes('Open');
+  const nextStatus = isCurrentlyOpen ? 'closed' : 'open';
+  
+  try {
+    const res = await fetch(`/api/helpdesk/sessions/${activeChatPhone}/toggle-ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ ticket_status: nextStatus })
+    });
+    if (res.ok) {
+      showToast(`Status Tiket diubah ke: ${nextStatus.toUpperCase()}`);
+      await refreshActiveHelpdeskChat();
+      await loadHelpdeskChats(true);
+    }
+  } catch (err) {
+    showToast('Failed to toggle ticket status', true);
+  }
+};
+
+// Send Reply Message
+window.sendHelpdeskMessage = async function(event) {
+  event.preventDefault();
+  if (!activeChatPhone) return;
+
+  const inputEl = document.getElementById('helpdesk-message-input');
+  const text = inputEl?.value.trim();
+  if (!text) return;
+
+  try {
+    const res = await fetch(`/api/helpdesk/sessions/${activeChatPhone}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': token },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('Failed to send message');
+    
+    if (inputEl) inputEl.value = '';
+    await refreshActiveHelpdeskChat();
+    
+    // Scroll chat history to bottom
+    const historyContainer = document.getElementById('helpdesk-chat-history');
+    if (historyContainer) historyContainer.scrollTop = historyContainer.scrollHeight;
+    
+    await loadHelpdeskChats(true);
+  } catch (err) {
+    showToast(err.message, true);
+  }
+};
+
+// Polling for helpdesk updates
+function startHelpdeskPolling() {
+  stopHelpdeskPolling();
+  loadHelpdeskChats();
+  helpdeskPollInterval = setInterval(() => {
+    if (currentTab === 'helpdesk') {
+      loadHelpdeskChats(true);
+      if (activeChatPhone) {
+        refreshActiveHelpdeskChat();
+      }
+    }
+  }, 4000);
+}
+
+function stopHelpdeskPolling() {
+  if (helpdeskPollInterval) {
+    clearInterval(helpdeskPollInterval);
+    helpdeskPollInterval = null;
   }
 }
