@@ -320,8 +320,8 @@ async function handleChatbotMessage(from, rawText) {
   
   let session = await getSession(from);
   
-  // Language detection (dynamic token scoring)
-  let lang = 'id';
+  // Language detection (default to English, switch to Indonesian if ID keywords score higher)
+  let lang = 'en';
   if (session && session.lang) {
     lang = session.lang;
   } else {
@@ -337,10 +337,10 @@ async function handleChatbotMessage(from, rawText) {
       if (enWords.includes(token)) enScore++;
     });
     
-    if (enScore > idScore) {
-      lang = 'en';
-    } else {
+    if (idScore > enScore) {
       lang = 'id';
+    } else {
+      lang = 'en';
     }
 
     // Save initial session to persist detected language
