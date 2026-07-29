@@ -364,9 +364,18 @@ async function initializeDatabase() {
         payment_method TEXT,
         bot_mode TEXT DEFAULT 'bot',
         ticket_status TEXT DEFAULT 'closed',
-        ticket_subject TEXT
+        ticket_subject TEXT,
+        lang TEXT DEFAULT 'en'
       )
     `);
+
+    // Safe migration: Add lang column if not exists
+    try {
+      await dbRun("ALTER TABLE chatbot_sessions ADD COLUMN lang TEXT DEFAULT 'en'");
+      console.log('Added lang column to chatbot_sessions.');
+    } catch (e) {
+      // Column already exists, ignore
+    }
   } catch (error) {
     console.error('Database initialization error:', error);
   }
