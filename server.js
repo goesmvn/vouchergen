@@ -123,7 +123,8 @@ async function initializeDatabase() {
       { name: 'discount_label', type: 'TEXT DEFAULT \'Diskon\'' },
       { name: 'tax_rate', type: 'REAL DEFAULT 0' },
       { name: 'service_fee', type: 'REAL DEFAULT 0' },
-      { name: 'agent_id', type: 'INTEGER DEFAULT NULL' }
+      { name: 'agent_id', type: 'INTEGER DEFAULT NULL' },
+      { name: 'customer_phone', type: 'TEXT DEFAULT NULL' }
     ];
     for (const col of invoiceCols) {
       try {
@@ -352,7 +353,6 @@ async function initializeDatabase() {
       console.log('Seeded initial payment methods.');
     }
 
-    // Create Chatbot Sessions Table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS chatbot_sessions (
         phone TEXT PRIMARY KEY,
@@ -365,7 +365,8 @@ async function initializeDatabase() {
         bot_mode TEXT DEFAULT 'bot',
         ticket_status TEXT DEFAULT 'closed',
         ticket_subject TEXT,
-        lang TEXT DEFAULT 'en'
+        lang TEXT DEFAULT 'en',
+        visit_date TEXT
       )
     `);
 
@@ -373,6 +374,14 @@ async function initializeDatabase() {
     try {
       await dbRun("ALTER TABLE chatbot_sessions ADD COLUMN lang TEXT DEFAULT 'en'");
       console.log('Added lang column to chatbot_sessions.');
+    } catch (e) {
+      // Column already exists, ignore
+    }
+
+    // Safe migration: Add visit_date column if not exists
+    try {
+      await dbRun("ALTER TABLE chatbot_sessions ADD COLUMN visit_date TEXT DEFAULT NULL");
+      console.log('Added visit_date column to chatbot_sessions.');
     } catch (e) {
       // Column already exists, ignore
     }
@@ -597,11 +606,11 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     const result = await dbRun(
       `INSERT INTO invoices (
         customer_name, total_price, down_payment, payment_method, status, voucher_code, visit_date, items,
-        discount_rate, discount_type, discount_label, tax_rate, service_fee, agent_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        discount_rate, discount_type, discount_label, tax_rate, service_fee, agent_id, customer_phone
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerName, totalPrice, dpValue, paymentMethod, initialStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
-        discRate, discType, discLabel, txRate, svFee, agId
+        discRate, discType, discLabel, txRate, svFee, agId, req.body.customerPhone || null
       ]
     );
 
@@ -620,7 +629,8 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
       discount_label: discLabel,
       tax_rate: txRate,
       service_fee: svFee,
-      agent_id: agId
+      agent_id: agId,
+      customer_phone: req.body.customerPhone || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -663,6 +673,43 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
       "UPDATE invoices SET status = 'Paid', down_payment = ?, voucher_code = ? WHERE id = ?",
       [finalTotal, voucherCode, id]
     );
+
+    // Send WhatsApp payment confirmation & voucher
+    if (invoice.customer_phone) {
+      try {
+        const settingsRows = await dbAll("SELECT * FROM settings");
+        const settings = {};
+        settingsRows.forEach(r => { settings[r.key] = r.value; });
+        const merchantWebsite = settings.merchant_website || 'www.baturhotspring.com';
+        
+        let itemsDesc = "";
+        try {
+          const parsedItems = JSON.parse(invoice.items || '[]');
+          parsedItems.forEach(it => {
+            itemsDesc += `\n- ${it.ticket_title} (${it.quantity} pcs)`;
+          });
+        } catch (e) {
+          itemsDesc = `\n- Tiket Masuk`;
+        }
+
+        const msg = `*PEMBAYARAN LUNAS & VOUCHER DIKIRIM* 🎉\n\n` +
+                    `Halo *${invoice.customer_name}*,\n` +
+                    `Pembayaran Anda untuk Invoice *#${invoice.id}* telah dikonfirmasi LUNAS.\n\n` +
+                    `Detail Voucher:\n` +
+                    `• Kode Voucher: *${voucherCode}*\n` +
+                    `• Tanggal Kunjungan: *${invoice.visit_date || '—'}*\n` +
+                    `• Layanan/Tiket:${itemsDesc}\n\n` +
+                    `Silakan unduh voucher QR code Anda di link berikut:\n` +
+                    `http://${merchantWebsite}/vouchers.html?code=${voucherCode}\n\n` +
+                    `Tunjukkan QR code voucher saat tiba di loket masuk.\n` +
+                    `Terima kasih atas kunjungan Anda!`;
+
+        await whatsapp.sendManualMessage(invoice.customer_phone, msg);
+      } catch (err) {
+        console.error('Error sending WhatsApp payment notification:', err.message);
+      }
+    }
+
     res.json({ message: 'Payment confirmed successfully', status: 'Paid', voucher_code: voucherCode });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -765,11 +812,12 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
         discount_label = ?,
         tax_rate = ?,
         service_fee = ?,
-        agent_id = ?
+        agent_id = ?,
+        customer_phone = ?
       WHERE id = ?`,
       [
         customerName, totalPrice, dpValue, paymentMethod, newStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
-        discRate, discType, discLabel, txRate, svFee, agId, id
+        discRate, discType, discLabel, txRate, svFee, agId, req.body.customerPhone || null, id
       ]
     );
 
@@ -788,7 +836,8 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
       discount_label: discLabel,
       tax_rate: txRate,
       service_fee: svFee,
-      agent_id: agId
+      agent_id: agId,
+      customer_phone: req.body.customerPhone || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -865,6 +914,42 @@ app.post('/api/invoices/:id/add-payment', authenticateToken, async (req, res) =>
       'UPDATE invoices SET down_payment = ?, status = ?, voucher_code = ? WHERE id = ?',
       [newDP, newStatus, voucherCode, id]
     );
+
+    // Send WhatsApp payment confirmation & voucher if fully paid
+    if (isFullyPaid && invoice.customer_phone) {
+      try {
+        const settingsRows = await dbAll("SELECT * FROM settings");
+        const settings = {};
+        settingsRows.forEach(r => { settings[r.key] = r.value; });
+        const merchantWebsite = settings.merchant_website || 'www.baturhotspring.com';
+        
+        let itemsDesc = "";
+        try {
+          const parsedItems = JSON.parse(invoice.items || '[]');
+          parsedItems.forEach(it => {
+            itemsDesc += `\n- ${it.ticket_title} (${it.quantity} pcs)`;
+          });
+        } catch (e) {
+          itemsDesc = `\n- Tiket Masuk`;
+        }
+
+        const msg = `*PEMBAYARAN LUNAS & VOUCHER DIKIRIM* 🎉\n\n` +
+                    `Halo *${invoice.customer_name}*,\n` +
+                    `Pembayaran Anda untuk Invoice *#${invoice.id}* telah dikonfirmasi LUNAS.\n\n` +
+                    `Detail Voucher:\n` +
+                    `• Kode Voucher: *${voucherCode}*\n` +
+                    `• Tanggal Kunjungan: *${invoice.visit_date || '—'}*\n` +
+                    `• Layanan/Tiket:${itemsDesc}\n\n` +
+                    `Silakan unduh voucher QR code Anda di link berikut:\n` +
+                    `http://${merchantWebsite}/vouchers.html?code=${voucherCode}\n\n` +
+                    `Tunjukkan QR code voucher saat tiba di loket masuk.\n` +
+                    `Terima kasih atas kunjungan Anda!`;
+
+        await whatsapp.sendManualMessage(invoice.customer_phone, msg);
+      } catch (err) {
+        console.error('Error sending WhatsApp payment notification:', err.message);
+      }
+    }
 
     res.json({
       message: isFullyPaid ? 'Payment complete! Voucher issued.' : 'Down payment recorded.',
@@ -1253,13 +1338,13 @@ app.get('/api/internal/session/:phone', async (req, res) => {
 });
 
 app.post('/api/internal/session/:phone', async (req, res) => {
-  const { step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang } = req.body;
+  const { step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date } = req.body;
   try {
     await dbRun(
       `INSERT OR REPLACE INTO chatbot_sessions 
-       (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.params.phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang]
+       (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date || null]
     );
     res.json({ success: true });
   } catch (error) {

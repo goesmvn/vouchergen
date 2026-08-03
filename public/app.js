@@ -1043,12 +1043,15 @@ function renderOrdersTable() {
     const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
 
+    const visitLabel = inv.visit_date || '—';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>#${inv.id}</td>
-      <td><strong>${inv.customer_name}</strong></td>
+      <td><strong>${inv.customer_name}</strong>${inv.customer_phone ? `<br><span class="text-xs text-secondary font-mono">${inv.customer_phone}</span>` : ''}</td>
       <td>${descText}</td>
       <td>${totalQty}</td>
+      <td>${visitLabel}</td>
       <td>Rp ${inv.total_price.toLocaleString('id-ID')}</td>
       <td>${inv.payment_method}</td>
       <td>${statusBadge}</td>
@@ -1065,7 +1068,7 @@ function renderInvoicesTable() {
   tbody.innerHTML = '';
 
   if (invoiceCatalog.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-secondary text-center">No invoices found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-secondary text-center">No invoices found.</td></tr>';
     return;
   }
 
@@ -1086,12 +1089,15 @@ function renderInvoicesTable() {
     const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
 
+    const visitLabel = inv.visit_date || '—';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>#${inv.id}</td>
-      <td><strong>${inv.customer_name}</strong></td>
+      <td><strong>${inv.customer_name}</strong>${inv.customer_phone ? `<br><span class="text-xs text-secondary font-mono">${inv.customer_phone}</span>` : ''}</td>
       <td>${descText}</td>
       <td>${totalQty}</td>
+      <td>${visitLabel}</td>
       <td>Rp ${inv.total_price.toLocaleString('id-ID')}</td>
       <td>${statusBadge}</td>
       <td class="space-x-1">
@@ -1113,7 +1119,7 @@ function renderVouchersList() {
   const paidVouchers = invoiceCatalog.filter(i => i.current_status === 'Paid' || i.current_status === 'Redeemed');
 
   if (paidVouchers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-secondary text-center">No paid or active vouchers found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-secondary text-center">No paid or active vouchers found.</td></tr>';
     return;
   }
 
@@ -1128,12 +1134,15 @@ function renderVouchersList() {
     const descText = items.length > 1 ? `${firstItem.ticket_title} + ${items.length - 1} more` : firstItem.ticket_title;
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
 
+    const visitLabel = inv.visit_date || '—';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="font-code-mono">${inv.voucher_code}</td>
-      <td><strong>${inv.customer_name}</strong></td>
+      <td><strong>${inv.customer_name}</strong>${inv.customer_phone ? `<br><span class="text-xs text-secondary font-mono">${inv.customer_phone}</span>` : ''}</td>
       <td>${descText}</td>
       <td>${totalQty}</td>
+      <td>${visitLabel}</td>
       <td>${statusBadge}</td>
       <td>
         <button class="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-all" onclick="openVoucherModal('${inv.voucher_code}')" title="View Ticket (QR)"><span class="material-symbols-outlined text-[18px]">qr_code</span></button>
@@ -2946,6 +2955,8 @@ async function processBookingSubmit(payDirectly = false) {
     let discType = document.getElementById('checkout-discount-type')?.value || 'percentage';
     let discLabel = document.getElementById('checkout-discount-label')?.value.trim() || '';
 
+    const customerPhone = document.getElementById('booking-customer-phone').value.trim();
+
     // Calculate total discount from agent contract items if applicable
     if (agentId && agentContractItems[agentId] && Object.keys(agentContractItems[agentId]).length > 0) {
       let contractDiscountAmt = 0;
@@ -2982,6 +2993,7 @@ async function processBookingSubmit(payDirectly = false) {
       },
       body: JSON.stringify({
         customerName,
+        customerPhone,
         items: orderItems,
         paymentMethod,
         visitDate: selectedBookingDateString || null,
@@ -3020,6 +3032,7 @@ async function processBookingSubmit(payDirectly = false) {
 
 function resetBookingFlow() {
   window.editingInvoiceId = null;
+  document.getElementById('booking-customer-phone').value = '';
   
   const submitBtn = document.getElementById('booking-submit-btn');
   if (submitBtn) {
@@ -3085,6 +3098,7 @@ function startEditInvoice(inv) {
 
   document.getElementById('booking-customer-name').value = inv.customer_name || '';
   document.getElementById('checkout-down-payment').value = inv.down_payment ? inv.down_payment.toLocaleString('id-ID') : '';
+  document.getElementById('booking-customer-phone').value = inv.customer_phone || '';
   
   // Set customer type & agent select first
   const custTypeEl = document.getElementById('booking-customer-type');

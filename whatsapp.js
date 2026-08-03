@@ -216,7 +216,8 @@ async function getSession(jid) {
     ticket_status: row.ticket_status,
     ticket_subject: row.ticket_subject,
     lang: row.lang || 'id',
-    quantity: row.quantity
+    quantity: row.quantity,
+    visitDate: row.visit_date
   };
   
   if (row.ticket_id) {
@@ -237,8 +238,8 @@ async function saveSession(jid, session) {
   
   await dbRun(
     `INSERT OR REPLACE INTO chatbot_sessions 
-     (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       phone,
       session.step || 0,
@@ -250,7 +251,8 @@ async function saveSession(jid, session) {
       session.bot_mode || 'bot',
       session.ticket_status || 'closed',
       session.ticket_subject || null,
-      session.lang || 'id'
+      session.lang || 'id',
+      session.visitDate || null
     ]
   );
 }
@@ -259,7 +261,7 @@ async function deleteSession(jid) {
   const phone = cleanPhone(jid);
   await dbRun(
     `UPDATE chatbot_sessions 
-     SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL 
+     SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL, visit_date = NULL 
      WHERE phone = ?`,
     [phone]
   );
@@ -461,6 +463,27 @@ async function handleChatbotMessage(from, rawText) {
       }
       
       session.quantity = qty;
+      session.step = 35; // Awaiting Visit Date
+      await saveSession(from, session);
+      
+      const reply = T.step3_date_prompt[lang];
+      await sock.sendMessage(from, { text: reply });
+      await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
+      return;
+    }
+
+    // Step 3.5: Awaiting Visit Date
+    if (session.step === 35) {
+      // Validate date YYYY-MM-DD
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(text)) {
+        const reply = T.step3_date_invalid[lang];
+        await sock.sendMessage(from, { text: reply });
+        await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
+        return;
+      }
+
+      session.visitDate = text;
       session.step = 4;
       await saveSession(from, session);
       
@@ -494,6 +517,7 @@ async function handleChatbotMessage(from, rawText) {
         .replace('{name}', session.name)
         .replace('{title}', session.ticket.title.trim())
         .replace('{quantity}', session.quantity)
+        .replace('{visit_date}', session.visitDate || '—')
         .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
         .replace('{payment_method}', session.paymentMethod);
         
@@ -522,10 +546,11 @@ async function handleChatbotMessage(from, rawText) {
         }];
         
         try {
+          const cleanPhoneNum = cleanPhone(from);
           const resInvoice = await dbRun(
-            `INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, items) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [session.name, totalBill, session.paymentMethod, 'Unpaid', voucherCode, JSON.stringify(validatedItems)]
+            `INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, visit_date, items, customer_phone) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [session.name, totalBill, session.paymentMethod, 'Unpaid', voucherCode, session.visitDate || null, JSON.stringify(validatedItems), cleanPhoneNum]
           );
           
           await deleteSession(from);
@@ -546,6 +571,7 @@ async function handleChatbotMessage(from, rawText) {
             .replace('{name}', session.name)
             .replace('{title}', session.ticket.title.trim())
             .replace('{quantity}', session.quantity)
+            .replace('{visit_date}', session.visitDate || '—')
             .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
             .replace('{payment_instructions}', paymentInstructions)
             .replace('{merchant_website}', merchantWebsite);
