@@ -217,7 +217,8 @@ async function getSession(jid) {
     ticket_subject: row.ticket_subject,
     lang: row.lang || 'id',
     quantity: row.quantity,
-    visitDate: row.visit_date
+    visitDate: row.visit_date,
+    paypalEmail: row.paypal_email
   };
   
   if (row.ticket_id) {
@@ -238,8 +239,8 @@ async function saveSession(jid, session) {
   
   await dbRun(
     `INSERT OR REPLACE INTO chatbot_sessions 
-     (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date, paypal_email) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       phone,
       session.step || 0,
@@ -252,7 +253,8 @@ async function saveSession(jid, session) {
       session.ticket_status || 'closed',
       session.ticket_subject || null,
       session.lang || 'id',
-      session.visitDate || null
+      session.visitDate || null,
+      session.paypalEmail || null
     ]
   );
 }
@@ -261,7 +263,7 @@ async function deleteSession(jid) {
   const phone = cleanPhone(jid);
   await dbRun(
     `UPDATE chatbot_sessions 
-     SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL, visit_date = NULL 
+     SET step = 0, name = NULL, ticket_id = NULL, quantity = NULL, payment_method = NULL, visit_date = NULL, paypal_email = NULL 
      WHERE phone = ?`,
     [phone]
   );
@@ -509,6 +511,16 @@ async function handleChatbotMessage(from, rawText) {
       }
       
       session.paymentMethod = session.availablePayments[val - 1].name;
+      
+      if (session.paymentMethod === 'PayPal') {
+        session.step = 45; // Awaiting PayPal Email
+        await saveSession(from, session);
+        const reply = T.step4_paypal_prompt[lang];
+        await sock.sendMessage(from, { text: reply });
+        await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
+        return;
+      }
+
       session.step = 5;
       await saveSession(from, session);
       
@@ -519,8 +531,40 @@ async function handleChatbotMessage(from, rawText) {
         .replace('{quantity}', session.quantity)
         .replace('{visit_date}', session.visitDate || '—')
         .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
-        .replace('{payment_method}', session.paymentMethod);
+        .replace('{payment_method}', session.paymentMethod)
+        .replace('{paypal_email_info}', '');
         
+      await sock.sendMessage(from, { text: reply });
+      await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
+      return;
+    }
+
+    // Step 4.5: Awaiting PayPal Email
+    if (session.step === 45) {
+      // Basic email regex
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(text)) {
+        const reply = T.step4_paypal_invalid[lang];
+        await sock.sendMessage(from, { text: reply });
+        await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
+        return;
+      }
+
+      session.paypalEmail = text;
+      session.step = 5;
+      await saveSession(from, session);
+
+      const totalBill = (session.ticket.price - (session.ticket.discount || 0)) * session.quantity;
+      const paypalInfo = ` (${session.paypalEmail})`;
+      const reply = T.step4_prompt[lang]
+        .replace('{name}', session.name)
+        .replace('{title}', session.ticket.title.trim())
+        .replace('{quantity}', session.quantity)
+        .replace('{visit_date}', session.visitDate || '—')
+        .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
+        .replace('{payment_method}', session.paymentMethod)
+        .replace('{paypal_email_info}', paypalInfo);
+
       await sock.sendMessage(from, { text: reply });
       await dbRun("INSERT INTO whatsapp_logs (phone, message, reply) VALUES (?, ?, ?)", [cleanPhone(from), rawText, reply]);
       return;
@@ -548,9 +592,9 @@ async function handleChatbotMessage(from, rawText) {
         try {
           const cleanPhoneNum = cleanPhone(from);
           const resInvoice = await dbRun(
-            `INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, visit_date, items, customer_phone) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [session.name, totalBill, session.paymentMethod, 'Unpaid', voucherCode, session.visitDate || null, JSON.stringify(validatedItems), cleanPhoneNum]
+            `INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, visit_date, items, customer_phone, paypal_email) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [session.name, totalBill, session.paymentMethod, 'Unpaid', voucherCode, session.visitDate || null, JSON.stringify(validatedItems), cleanPhoneNum, session.paypalEmail || null]
           );
           
           await deleteSession(from);
@@ -565,6 +609,7 @@ async function handleChatbotMessage(from, rawText) {
             paymentInstructions = T.cash_instruction[lang];
           }
           
+          const paypalEmailInfo = session.paypalEmail ? ` (${session.paypalEmail})` : "";
           const reply = T.step5_success[lang]
             .replace('{invoice_id}', resInvoice.id)
             .replace('{voucher_code}', voucherCode)
@@ -572,6 +617,8 @@ async function handleChatbotMessage(from, rawText) {
             .replace('{title}', session.ticket.title.trim())
             .replace('{quantity}', session.quantity)
             .replace('{visit_date}', session.visitDate || '—')
+            .replace('{payment_method}', session.paymentMethod)
+            .replace('{paypal_email_info}', paypalEmailInfo)
             .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
             .replace('{payment_instructions}', paymentInstructions)
             .replace('{merchant_website}', merchantWebsite);

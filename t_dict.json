@@ -43,17 +43,25 @@
     "id": "Format tanggal tidak valid. Silakan gunakan format YYYY-MM-DD (contoh: *2026-03-15*):",
     "en": "Invalid date format. Please use YYYY-MM-DD format (e.g., *2026-03-15*):"
   },
+  "step4_paypal_prompt": {
+    "id": "Silakan masukkan email PayPal Anda untuk memverifikasi pembayaran tagihan nanti:",
+    "en": "Please enter your PayPal email address for bill verification later:"
+  },
+  "step4_paypal_invalid": {
+    "id": "Email tidak valid. Silakan masukkan format email PayPal yang benar (contoh: *nama@domain.com*):",
+    "en": "Invalid email. Please enter a valid PayPal email address (e.g., *name@domain.com*):"
+  },
   "step4_invalid": {
     "id": "Pilihan pembayaran tidak valid. Silakan ketik angka *1* sampai *{count}*.",
     "en": "Invalid payment selection. Please type a number from *1* to *{count}*."
   },
   "step4_prompt": {
-    "id": "Berikut ringkasan pesanan Anda:\n\n• Nama: *{name}*\n• Tiket: *{title}*\n• Jumlah: *{quantity} pcs*\n• Tanggal Kunjungan: *{visit_date}*\n• Total Bayar: *Rp {total_bill:,}*\n• Pembayaran: *{payment_method}*\n\nApakah data pesanan ini sudah benar?\nKetik *YA* jika setuju, atau *BATAL* jika ingin membatalkan.",
-    "en": "Here is your booking summary:\n\n• Name: *{name}*\n• Ticket: *{title}*\n• Quantity: *{quantity} pcs*\n• Visit Date: *{visit_date}*\n• Total Bill: *Rp {total_bill:,}*\n• Payment Method: *{payment_method}*\n\nIs this booking information correct?\nType *YES* to confirm, or *CANCEL* to cancel."
+    "id": "Berikut ringkasan pesanan Anda:\n\n• Nama: *{name}*\n• Tiket: *{title}*\n• Jumlah: *{quantity} pcs*\n• Tanggal Kunjungan: *{visit_date}*\n• Total Bayar: *Rp {total_bill:,}*\n• Pembayaran: *{payment_method}*{paypal_email_info}\n\nApakah data pesanan ini sudah benar?\nKetik *YA* jika setuju, atau *BATAL* jika ingin membatalkan.",
+    "en": "Here is your booking summary:\n\n• Name: *{name}*\n• Ticket: *{title}*\n• Quantity: *{quantity} pcs*\n• Visit Date: *{visit_date}*\n• Total Bill: *Rp {total_bill:,}*\n• Payment Method: *{payment_method}*{paypal_email_info}\n\nIs this booking information correct?\nType *YES* to confirm, or *CANCEL* to cancel."
   },
   "step5_success": {
-    "id": "Pemesanan Berhasil! 🎉\n\n• *Invoice ID*: #{invoice_id}\n• *Voucher Code*: {voucher_code}\n• *Nama*: {name}\n• *Tiket*: {title}\n• *Jumlah*: {quantity} pcs\n• *Tanggal Kunjungan*: {visit_date}\n• *Total Bayar*: Rp {total_bill:,}\n• *Status*: Belum Lunas (Unpaid){payment_instructions}\n\nSetelah pembayaran lunas, voucher aktif Anda dapat diakses dan diunduh di website kami: http://{merchant_website}/vouchers.html?code={voucher_code}\n\nTerima kasih! Sampai jumpa di Batur Hot Spring.",
-    "en": "Booking Successful! 🎉\n\n• *Invoice ID*: #{invoice_id}\n• *Voucher Code*: {voucher_code}\n• *Name*: {name}\n• *Ticket*: {title}\n• *Quantity*: {quantity} pcs\n• *Visit Date*: {visit_date}\n• *Total Bill*: Rp {total_bill:,}\n• *Status*: Unpaid{payment_instructions}\n\nOnce payment is completed, your active voucher can be accessed and downloaded on our website: http://{merchant_website}/vouchers.html?code={voucher_code}\n\nThank you! See you at Batur Hot Spring."
+    "id": "Pemesanan Berhasil! 🎉\n\n• *Invoice ID*: #{invoice_id}\n• *Voucher Code*: {voucher_code}\n• *Nama*: {name}\n• *Tiket*: {title}\n• *Jumlah*: {quantity} pcs\n• *Tanggal Kunjungan*: {visit_date}\n• *Metode*: {payment_method}{paypal_email_info}\n• *Total Bayar*: Rp {total_bill:,}\n• *Status*: Belum Lunas (Unpaid){payment_instructions}\n\nSetelah pembayaran lunas, voucher aktif Anda dapat diakses dan diunduh di website kami: http://{merchant_website}/vouchers.html?code={voucher_code}\n\nTerima kasih! Sampai jumpa di Batur Hot Spring.",
+    "en": "Booking Successful! 🎉\n\n• *Invoice ID*: #{invoice_id}\n• *Voucher Code*: {voucher_code}\n• *Name*: {name}\n• *Ticket*: {title}\n• *Quantity*: {quantity} pcs\n• *Visit Date*: {visit_date}\n• *Method*: {payment_method}{paypal_email_info}\n• *Total Bill*: Rp {total_bill:,}\n• *Status*: Unpaid{payment_instructions}\n\nOnce payment is completed, your active voucher can be accessed and downloaded on our website: http://{merchant_website}/vouchers.html?code={voucher_code}\n\nThank you! See you at Batur Hot Spring."
   },
   "step5_error": {
     "id": "Maaf, terjadi kesalahan sistem saat membuat pesanan Anda. Silakan coba lagi nanti.",

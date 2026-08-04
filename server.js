@@ -124,7 +124,8 @@ async function initializeDatabase() {
       { name: 'tax_rate', type: 'REAL DEFAULT 0' },
       { name: 'service_fee', type: 'REAL DEFAULT 0' },
       { name: 'agent_id', type: 'INTEGER DEFAULT NULL' },
-      { name: 'customer_phone', type: 'TEXT DEFAULT NULL' }
+      { name: 'customer_phone', type: 'TEXT DEFAULT NULL' },
+      { name: 'paypal_email', type: 'TEXT DEFAULT NULL' }
     ];
     for (const col of invoiceCols) {
       try {
@@ -133,6 +134,14 @@ async function initializeDatabase() {
       } catch (e) {
         // ignore if exists
       }
+    }
+
+    // Safe migration: Add paypal_email column to invoices
+    try {
+      await dbRun("ALTER TABLE invoices ADD COLUMN paypal_email TEXT DEFAULT NULL");
+      console.log("Added paypal_email column to invoices.");
+    } catch (e) {
+      // ignore if exists
     }
 
     // Agents Table
@@ -353,6 +362,7 @@ async function initializeDatabase() {
       console.log('Seeded initial payment methods.');
     }
 
+    // Create Chatbot Sessions Table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS chatbot_sessions (
         phone TEXT PRIMARY KEY,
@@ -366,7 +376,8 @@ async function initializeDatabase() {
         ticket_status TEXT DEFAULT 'closed',
         ticket_subject TEXT,
         lang TEXT DEFAULT 'en',
-        visit_date TEXT
+        visit_date TEXT,
+        paypal_email TEXT
       )
     `);
 
@@ -382,6 +393,14 @@ async function initializeDatabase() {
     try {
       await dbRun("ALTER TABLE chatbot_sessions ADD COLUMN visit_date TEXT DEFAULT NULL");
       console.log('Added visit_date column to chatbot_sessions.');
+    } catch (e) {
+      // Column already exists, ignore
+    }
+
+    // Safe migration: Add paypal_email column if not exists
+    try {
+      await dbRun("ALTER TABLE chatbot_sessions ADD COLUMN paypal_email TEXT DEFAULT NULL");
+      console.log('Added paypal_email column to chatbot_sessions.');
     } catch (e) {
       // Column already exists, ignore
     }
@@ -606,11 +625,11 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
     const result = await dbRun(
       `INSERT INTO invoices (
         customer_name, total_price, down_payment, payment_method, status, voucher_code, visit_date, items,
-        discount_rate, discount_type, discount_label, tax_rate, service_fee, agent_id, customer_phone
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        discount_rate, discount_type, discount_label, tax_rate, service_fee, agent_id, customer_phone, paypal_email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerName, totalPrice, dpValue, paymentMethod, initialStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
-        discRate, discType, discLabel, txRate, svFee, agId, req.body.customerPhone || null
+        discRate, discType, discLabel, txRate, svFee, agId, req.body.customerPhone || null, req.body.paypalEmail || null
       ]
     );
 
@@ -630,7 +649,8 @@ app.post('/api/invoices', authenticateToken, async (req, res) => {
       tax_rate: txRate,
       service_fee: svFee,
       agent_id: agId,
-      customer_phone: req.body.customerPhone || null
+      customer_phone: req.body.customerPhone || null,
+      paypal_email: req.body.paypalEmail || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -813,11 +833,12 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
         tax_rate = ?,
         service_fee = ?,
         agent_id = ?,
-        customer_phone = ?
+        customer_phone = ?,
+        paypal_email = ?
       WHERE id = ?`,
       [
         customerName, totalPrice, dpValue, paymentMethod, newStatus, voucherCode, visitDate || null, JSON.stringify(validatedItems),
-        discRate, discType, discLabel, txRate, svFee, agId, req.body.customerPhone || null, id
+        discRate, discType, discLabel, txRate, svFee, agId, req.body.customerPhone || null, req.body.paypalEmail || null, id
       ]
     );
 
@@ -837,7 +858,8 @@ app.put('/api/invoices/:id', authenticateToken, async (req, res) => {
       tax_rate: txRate,
       service_fee: svFee,
       agent_id: agId,
-      customer_phone: req.body.customerPhone || null
+      customer_phone: req.body.customerPhone || null,
+      paypal_email: req.body.paypalEmail || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1338,13 +1360,13 @@ app.get('/api/internal/session/:phone', async (req, res) => {
 });
 
 app.post('/api/internal/session/:phone', async (req, res) => {
-  const { step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date } = req.body;
+  const { step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date, paypal_email } = req.body;
   try {
     await dbRun(
       `INSERT OR REPLACE INTO chatbot_sessions 
-       (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.params.phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date || null]
+       (phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date, paypal_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.phone, step, timestamp, name, ticket_id, quantity, payment_method, bot_mode, ticket_status, ticket_subject, lang, visit_date || null, paypal_email || null]
     );
     res.json({ success: true });
   } catch (error) {
