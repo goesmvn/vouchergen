@@ -700,7 +700,7 @@ app.post('/api/invoices/:id/pay', authenticateToken, async (req, res) => {
         const settingsRows = await dbAll("SELECT * FROM settings");
         const settings = {};
         settingsRows.forEach(r => { settings[r.key] = r.value; });
-        const merchantWebsite = settings.merchant_website || 'www.baturhotspring.com';
+        const merchantWebsite = 'voucher.baturhotspring.com';
         
         let itemsDesc = "";
         try {
@@ -943,7 +943,7 @@ app.post('/api/invoices/:id/add-payment', authenticateToken, async (req, res) =>
         const settingsRows = await dbAll("SELECT * FROM settings");
         const settings = {};
         settingsRows.forEach(r => { settings[r.key] = r.value; });
-        const merchantWebsite = settings.merchant_website || 'www.baturhotspring.com';
+        const merchantWebsite = 'voucher.baturhotspring.com';
         
         let itemsDesc = "";
         try {

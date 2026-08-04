@@ -313,7 +313,7 @@ async function handleChatbotMessage(from, rawText) {
   
   const merchantName = settings.merchant_name || 'Batur Hot Spring';
   const merchantAddress = settings.merchant_address || 'Toya Bungkah, Kintamani, Bangli, Bali';
-  const merchantWebsite = settings.merchant_website || 'www.baturhotspring.com';
+  const merchantWebsite = 'voucher.baturhotspring.com';
   const merchantPhone = settings.merchant_phone || '+62 812-3456-7890';
   const merchantEmail = settings.merchant_email || 'info@baturhotspring.com';
   
