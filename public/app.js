@@ -1520,19 +1520,20 @@ window.filterAgentSearchResults = function() {
   const dropdown = document.getElementById('booking-agent-search-results');
   if (!searchInput || !dropdown) return;
 
-  const query = searchInput.value.trim().toLowerCase();
+  const query = searchInput.value.trim();
+  const queryLower = query.toLowerCase();
   dropdown.innerHTML = '';
 
   const filtered = agentsList.filter(agent => 
-    agent.name.toLowerCase().includes(query) || 
-    agent.code.toLowerCase().includes(query)
+    agent.name.toLowerCase().includes(queryLower) || 
+    agent.code.toLowerCase().includes(queryLower)
   );
 
   if (filtered.length === 0) {
     dropdown.innerHTML = `
       <div class="p-3 text-xs text-on-surface-variant italic text-center">No agents found</div>
       <div class="p-2 border-t border-outline-variant text-center">
-        <button type="button" class="px-3 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-lg hover:bg-primary-dark transition-all w-full" onclick="quickAddAgent('${query}')">
+        <button type="button" class="px-3 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-lg hover:bg-primary-dark transition-all w-full" onclick="quickAddAgent(document.getElementById('booking-agent-search').value)">
           + Add Agent "${query}"
         </button>
       </div>
@@ -1556,6 +1557,19 @@ window.filterAgentSearchResults = function() {
     item.onclick = () => selectAgentFromSearch(agent.id, agent.name, agent.code);
     dropdown.appendChild(item);
   });
+
+  // Always show a quick-add option at the bottom if the query doesn't match an exact agent name
+  const exactMatch = agentsList.some(agent => agent.name.toLowerCase() === queryLower);
+  if (query && !exactMatch) {
+    const divider = document.createElement('div');
+    divider.className = "border-t border-outline-variant p-2";
+    divider.innerHTML = `
+      <button type="button" class="px-3 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-lg hover:bg-primary-dark transition-all w-full" onclick="quickAddAgent(document.getElementById('booking-agent-search').value)">
+        + Add Agent "${query}"
+      </button>
+    `;
+    dropdown.appendChild(divider);
+  }
 };
 
 window.selectAgentFromSearch = function(id, name, code) {
