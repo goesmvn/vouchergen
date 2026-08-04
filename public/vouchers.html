@@ -1,31 +1,31 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Detail Voucher - Batur Hot Spring</title>
+  <title>Voucher Details - Batur Hot Spring</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen p-4">
   <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-6">
     <div class="text-center">
-      <h2 class="text-2xl font-bold text-slate-800">E-Voucher Anda</h2>
-      <p class="text-slate-500 text-sm mt-1">Tunjukkan QR code di bawah ke loket masuk</p>
+      <h2 class="text-2xl font-bold text-slate-800">Your E-Voucher</h2>
+      <p class="text-slate-500 text-sm mt-1">Show the QR code below at the entrance counter</p>
     </div>
 
     <!-- Voucher Details -->
     <div id="voucher-details" class="bg-slate-50 rounded-xl p-4 border border-slate-150 space-y-3 hidden">
       <div class="flex justify-between border-b border-slate-200 pb-2">
-        <span class="text-slate-500 text-xs font-semibold uppercase">Nama Tamu</span>
+        <span class="text-slate-500 text-xs font-semibold uppercase">Guest Name</span>
         <span id="cust-name" class="text-slate-800 font-bold text-sm"></span>
       </div>
       <div class="flex justify-between border-b border-slate-200 pb-2">
-        <span class="text-slate-500 text-xs font-semibold uppercase">Tanggal Kunjungan</span>
+        <span class="text-slate-500 text-xs font-semibold uppercase">Visit Date</span>
         <span id="visit-date" class="text-slate-800 font-bold text-sm"></span>
       </div>
       <div class="flex justify-between border-b border-slate-200 pb-2">
-        <span class="text-slate-500 text-xs font-semibold uppercase">Kode Voucher</span>
+        <span class="text-slate-500 text-xs font-semibold uppercase">Voucher Code</span>
         <span id="voucher-code-text" class="text-slate-800 font-mono font-bold text-sm"></span>
       </div>
       <div class="flex justify-between">
@@ -37,8 +37,8 @@
     <!-- Sibling/Ticket Items List -->
     <div id="items-container" class="space-y-4"></div>
 
-    <div id="error-message" class="text-center text-red-500 font-bold hidden">Voucher tidak ditemukan atau belum lunas.</div>
-    <div id="loading" class="text-center text-slate-500">Memuat data voucher...</div>
+    <div id="error-message" class="text-center text-red-500 font-bold hidden">Voucher not found or unpaid.</div>
+    <div id="loading" class="text-center text-slate-500">Loading voucher details...</div>
   </div>
 
   <script>
@@ -47,7 +47,7 @@
       const code = urlParams.get('code');
       if (!code) {
         document.getElementById('loading').classList.add('hidden');
-        document.getElementById('error-message').innerText = 'Kode voucher kosong.';
+        document.getElementById('error-message').innerText = 'Voucher code is empty.';
         document.getElementById('error-message').classList.remove('hidden');
         return;
       }
@@ -61,7 +61,7 @@
 
         // Check if invoice/voucher is paid or redeemed
         if (data.status !== 'Paid' && data.status !== 'Redeemed') {
-          document.getElementById('error-message').innerText = 'Pembayaran voucher ini belum lunas / dikonfirmasi.';
+          document.getElementById('error-message').innerText = 'This voucher has not been fully paid or confirmed.';
           document.getElementById('error-message').classList.remove('hidden');
           return;
         }
@@ -73,10 +73,10 @@
         
         const statusEl = document.getElementById('voucher-status');
         if (data.redeemed) {
-          statusEl.innerText = 'SUDAH SCAN (REDEEMED)';
+          statusEl.innerText = 'REDEEMED (SCANNED)';
           statusEl.className = 'px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700';
         } else {
-          statusEl.innerText = 'AKTIF (BELUM SCAN)';
+          statusEl.innerText = 'ACTIVE (NOT SCANNED)';
           statusEl.className = 'px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700';
         }
 
