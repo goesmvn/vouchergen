@@ -1529,7 +1529,14 @@ window.filterAgentSearchResults = function() {
   );
 
   if (filtered.length === 0) {
-    dropdown.innerHTML = '<div class="p-3 text-xs text-on-surface-variant italic text-center">No agents found</div>';
+    dropdown.innerHTML = `
+      <div class="p-3 text-xs text-on-surface-variant italic text-center">No agents found</div>
+      <div class="p-2 border-t border-outline-variant text-center">
+        <button type="button" class="px-3 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-lg hover:bg-primary-dark transition-all w-full" onclick="quickAddAgent('${query}')">
+          + Add Agent "${query}"
+        </button>
+      </div>
+    `;
     return;
   }
 
@@ -1561,6 +1568,43 @@ window.selectAgentFromSearch = function(id, name, code) {
   if (dropdown) dropdown.classList.add('hidden');
 
   onAgentSelected();
+};
+
+window.quickAddAgent = async function(query) {
+  if (!query) return;
+  const name = query.trim();
+  const randNum = Math.floor(100000 + Math.random() * 900000);
+  const code = `AGT-${randNum}`;
+  
+  try {
+    const response = await fetch('/api/agents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+      },
+      body: JSON.stringify({
+        name,
+        code,
+        phone: '',
+        email: '',
+        discount_rate: 0,
+        discount_type: 'percentage',
+        address: ''
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create agent');
+
+    showToast(`Agent "${name}" added successfully!`);
+    await loadAgents(); // Reload agents list globally
+    
+    // Select the newly created agent
+    selectAgentFromSearch(data.id, name, code);
+  } catch (err) {
+    showToast(err.message, true);
+  }
 };
 
 // Global click listener to close agent search results
