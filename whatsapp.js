@@ -584,8 +584,9 @@ async function handleChatbotMessage(from, rawText) {
       if (session.paymentMethod === 'PayPal') {
         const rate = await getExchangeRate();
         const adjustedRate = rate * 0.98; // USD target: 2% more IDR per USD to protect value -> divide by rate * 0.98
-        const usdVal = (totalBill * 1.06) / adjustedRate; // 6% fee added
-        totalBillStr = `${Math.round(totalBill).toLocaleString('id-ID')} ($${usdVal.toFixed(2)})`;
+        const paypalTotalBill = totalBill * 1.06;
+        const usdVal = paypalTotalBill / adjustedRate; // 6% fee added
+        totalBillStr = `${Math.round(paypalTotalBill).toLocaleString('id-ID')} ($${usdVal.toFixed(2)})`;
       }
       const paypalInfo = ` (${session.paypalEmail})`;
       const reply = T.step4_prompt[lang]
