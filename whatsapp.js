@@ -626,7 +626,7 @@ async function handleChatbotMessage(from, rawText) {
           if (match && match[1]) {
             paypalEmail = match[1].trim();
           }
-          paymentInstructions = `\n\n${lang === 'en' ? 'Please send your payment to our PayPal email' : 'Silakan kirim pembayaran Anda ke email PayPal kami'}:\n*${paypalEmail}* ($${usdVal.toFixed(2)})`;
+          paymentInstructions = `\n\n${lang === 'en' ? 'Please send your payment to our PayPal email' : 'Silakan kirim pembayaran Anda ke email PayPal kami'}:\n${paypalEmail} ($${usdVal.toFixed(2)})`;
         } else if (session.paymentMethod === 'Transfer Bank') {
           const inst = settings.merchant_payment_instructions || 'Bank Transfer Jago';
           paymentInstructions = `\n\n${lang === 'en' ? 'Please transfer to' : 'Silakan transfer ke'}:\n*${inst}*`;
