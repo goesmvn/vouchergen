@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const QRCode = require('qrcode');
+const https = require('https');
 
 // Load translation dictionary
 const T = require('./t_dict.json');
@@ -40,6 +41,30 @@ let statusCache = { status: 'disconnected', qr: null, sessionsCount: 0 };
 let logsCache = [];
 let sock = null;
 let isStarted = false;
+
+// Fetch USD IDR rate helper
+function getExchangeRate() {
+  return new Promise((resolve) => {
+    https.get('https://open.er-api.com/v6/latest/USD', (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.rates && json.rates.IDR) {
+            resolve(parseFloat(json.rates.IDR));
+          } else {
+            resolve(15000); // fallback
+          }
+        } catch (e) {
+          resolve(15000);
+        }
+      });
+    }).on('error', () => {
+      resolve(15000);
+    });
+  });
+}
 
 // Sync session status count from SQLite directly
 async function updateSessionsCount() {
@@ -554,14 +579,21 @@ async function handleChatbotMessage(from, rawText) {
       session.step = 5;
       await saveSession(from, session);
 
-      const totalBill = (session.ticket.price - (session.ticket.discount || 0)) * session.quantity;
+      let totalBill = (session.ticket.price - (session.ticket.discount || 0)) * session.quantity;
+      let totalBillStr = Math.round(totalBill).toLocaleString('id-ID');
+      if (session.paymentMethod === 'PayPal') {
+        const rate = await getExchangeRate();
+        const adjustedRate = rate * 0.98; // USD target: 2% more IDR per USD to protect value -> divide by rate * 0.98
+        const usdVal = (totalBill * 1.06) / adjustedRate; // 6% fee added
+        totalBillStr = `${Math.round(totalBill).toLocaleString('id-ID')} ($${usdVal.toFixed(2)})`;
+      }
       const paypalInfo = ` (${session.paypalEmail})`;
       const reply = T.step4_prompt[lang]
         .replace('{name}', session.name)
         .replace('{title}', session.ticket.title.trim())
         .replace('{quantity}', session.quantity)
         .replace('{visit_date}', session.visitDate || '—')
-        .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
+        .replace('{total_bill:,}', totalBillStr)
         .replace('{payment_method}', session.paymentMethod)
         .replace('{paypal_email_info}', paypalInfo);
 
@@ -574,7 +606,32 @@ async function handleChatbotMessage(from, rawText) {
     if (session.step === 5) {
       const isYes = ['ya', 'yes'].includes(text);
       if (isYes) {
-        const totalBill = (session.ticket.price - (session.ticket.discount || 0)) * session.quantity;
+        let totalBill = (session.ticket.price - (session.ticket.discount || 0)) * session.quantity;
+        let invoiceTotalBill = totalBill;
+        
+        let paymentInstructions = "";
+        let totalBillStr = Math.round(totalBill).toLocaleString('id-ID');
+        
+        if (session.paymentMethod === 'PayPal') {
+          const rate = await getExchangeRate();
+          const adjustedRate = rate * 0.98; // USD target: 2% more IDR per USD to protect value -> divide by rate * 0.98
+          const usdVal = (totalBill * 1.06) / adjustedRate; // 6% fee added
+          invoiceTotalBill = totalBill * 1.06; // Store IDR bill with 6% fee in db
+          totalBillStr = `${Math.round(invoiceTotalBill).toLocaleString('id-ID')} ($${usdVal.toFixed(2)})`;
+          
+          let paypalEmail = merchantEmail;
+          const inst = settings.merchant_payment_instructions || "";
+          const match = inst.match(/PayPal:\s*\n*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+          if (match && match[1]) {
+            paypalEmail = match[1].trim();
+          }
+          paymentInstructions = `\n\n${lang === 'en' ? 'Please send your payment to our PayPal email' : 'Silakan kirim pembayaran Anda ke email PayPal kami'}:\n*${paypalEmail}* ($${usdVal.toFixed(2)})`;
+        } else if (session.paymentMethod === 'Transfer Bank') {
+          const inst = settings.merchant_payment_instructions || 'Bank Transfer Jago';
+          paymentInstructions = `\n\n${lang === 'en' ? 'Please transfer to' : 'Silakan transfer ke'}:\n*${inst}*`;
+        } else {
+          paymentInstructions = T.cash_instruction[lang];
+        }
         
         // Generate unique voucher code
         const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -586,7 +643,7 @@ async function handleChatbotMessage(from, rawText) {
           ticket_price: session.ticket.price,
           ticket_discount: session.ticket.discount || 0,
           quantity: session.quantity,
-          total_price: totalBill
+          total_price: invoiceTotalBill
         }];
         
         try {
@@ -594,20 +651,10 @@ async function handleChatbotMessage(from, rawText) {
           const resInvoice = await dbRun(
             `INSERT INTO invoices (customer_name, total_price, payment_method, status, voucher_code, visit_date, items, customer_phone, paypal_email) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [session.name, totalBill, session.paymentMethod, 'Unpaid', voucherCode, session.visitDate || null, JSON.stringify(validatedItems), cleanPhoneNum, session.paypalEmail || null]
+            [session.name, invoiceTotalBill, session.paymentMethod, 'Unpaid', voucherCode, session.visitDate || null, JSON.stringify(validatedItems), cleanPhoneNum, session.paypalEmail || null]
           );
           
           await deleteSession(from);
-          
-          let paymentInstructions = "";
-          if (session.paymentMethod === 'PayPal') {
-            paymentInstructions = `\n\n${lang === 'en' ? 'Please send your payment to our PayPal email' : 'Silakan kirim pembayaran Anda ke email PayPal kami'}:\n*${merchantEmail}*`;
-          } else if (session.paymentMethod === 'Transfer Bank') {
-            const inst = settings.merchant_payment_instructions || 'Bank Transfer Jago';
-            paymentInstructions = `\n\n${lang === 'en' ? 'Please transfer to' : 'Silakan transfer ke'}:\n*${inst}*`;
-          } else {
-            paymentInstructions = T.cash_instruction[lang];
-          }
           
           const paypalEmailInfo = session.paypalEmail ? ` (${session.paypalEmail})` : "";
           const reply = T.step5_success[lang]
@@ -619,7 +666,7 @@ async function handleChatbotMessage(from, rawText) {
             .replace('{visit_date}', session.visitDate || '—')
             .replace('{payment_method}', session.paymentMethod)
             .replace('{paypal_email_info}', paypalEmailInfo)
-            .replace('{total_bill:,}', Math.round(totalBill).toLocaleString('id-ID'))
+            .replace('{total_bill:,}', totalBillStr)
             .replace('{payment_instructions}', paymentInstructions)
             .replace('{merchant_website}', merchantWebsite);
             
